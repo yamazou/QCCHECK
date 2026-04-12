@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QC Check Entry</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    h1 { margin: 0; }
+    .header-sheet { border: 1px solid #333; margin-bottom: 12px; }
+    .header-main {
+      display: grid;
+      grid-template-columns: 188px 1fr 240px;
+      align-items: stretch;
+    }
+    .header-col-brand {
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 6px 8px 8px;
+      gap: 6px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .header-col-brand .brand-logo { display: flex; align-items: center; justify-content: center; width: 100%; }
+    .header-col-brand .brand-logo img { max-width: 100%; max-height: 52px; object-fit: contain; }
+    .header-col-brand .brand-name { font-weight: 700; font-size: 12px; line-height: 1.25; }
+    .header-col-brand .dept { font-style: italic; font-weight: 500; font-size: 11px; line-height: 1.2; }
+    .header-col-meta {
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      justify-content: flex-start;
+    }
+    .header-title-row {
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 8px;
+      flex-shrink: 0;
+    }
+    .header-title-row h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.35px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sign-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto minmax(88px, 1fr) auto;
+      min-height: 0;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    .sign-csno { grid-column: 1 / -1; border-bottom: 1px solid #333; padding: 4px 8px; font-size: 14px; }
+    .sign-lbl-prep, .sign-lbl-app {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 4px;
+      border-bottom: 1px solid #333;
+    }
+    .sign-lbl-prep { border-right: 1px solid #333; }
+    .sign-pad-prep, .sign-pad-app {
+      position: relative;
+      min-height: 88px;
+      border-bottom: 1px solid #333;
+    }
+    .sign-pad-prep { border-right: 1px solid #333; }
+    .header-sign-input {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      bottom: 6px;
+      width: auto;
+      max-width: none;
+      border: 0;
+      border-bottom: 1px solid #999;
+      text-align: center;
+      padding: 4px 2px 6px;
+      font-size: 12px;
+      background: transparent;
+      box-sizing: border-box;
+    }
+    .sign-yemi {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 700;
+      padding: 4px 4px 6px;
+    }
+    .meta-box {
+      flex: 0 1 auto;
+      display: grid;
+      grid-template-rows: repeat(5, auto);
+      grid-auto-rows: auto;
+      align-content: start;
+      min-height: 0;
+    }
+    .meta-row {
+      display: grid;
+      grid-template-columns: 118px 16px 1fr;
+      border-bottom: 1px solid #333;
+      align-items: center;
+      min-height: 28px;
+    }
+    .meta-row:last-child { border-bottom: 0; }
+    .meta-row .k { padding: 2px 4px 2px 6px; font-weight: 600; font-size: 12px; }
+    .meta-row .c { text-align: center; }
+    .meta-row .v { padding: 2px 6px; }
+    .meta-row input { border: 0; width: 100%; font-size: 13px; padding: 2px 0; }
+    .meta-row .v.part-dd { padding: 2px 6px 3px; }
+    .meta-row .v.part-dd select { width: 100%; font-size: 13px; padding: 4px 6px; box-sizing: border-box; }
+    .meta-row .v.part-pick { display: flex; gap: 6px; align-items: center; padding: 2px 6px 3px; }
+    .meta-row .v.part-pick select { flex: 1; min-width: 0; width: auto; font-size: 13px; padding: 4px 6px; }
+    .meta-row .v.part-pick button { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
+    .meta-row .v.eff-ym {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 4px;
+      padding: 1px 6px 2px;
+    }
+    .meta-row .v.eff-ym select {
+      width: auto;
+      min-width: 4.5em;
+      flex: 0 0 auto;
+      font-size: 13px;
+      padding: 3px 5px;
+      box-sizing: border-box;
+    }
+    .meta-row .v.eff-ym .eff-sep {
+      color: #666;
+      font-size: 12px;
+      flex-shrink: 0;
+      padding: 0 1px;
+      user-select: none;
+    }
+    .meta-row .v.eff-ym button {
+      flex-shrink: 0;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    label { font-size: 12px; color: #333; display: block; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+    .tabs { display: flex; gap: 8px; margin: 12px 0; }
+    .tab { padding: 8px 12px; border: 1px solid #aaa; cursor: pointer; background: #f8f8f8; }
+    .tab.active { background: #d9ecff; border-color: #5c9ded; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+    td input, td select { font-size: 12px; padding: 4px; }
+    .sheet-table-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; }
+    #tableWrap .detail-sheet td.check-col { min-width: 44px; vertical-align: middle; }
+    #tableWrap .detail-sheet td.check-col select {
+      min-width: 40px;
+      width: auto;
+      max-width: 100%;
+      cursor: pointer;
+      position: relative;
+      z-index: 2;
+    }
+    #tableWrap .detail-sheet td.date-cell { padding: 2px 4px; vertical-align: middle; }
+    #tableWrap .detail-sheet .date-cell-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    #tableWrap .detail-sheet .date-cell-wrap input[data-k="workDate"] {
+      text-align: center;
+      min-width: 7.2em;
+      max-width: 9.5em;
+      flex: 1 1 auto;
+      width: auto !important;
+    }
+    #tableWrap .detail-sheet .date-cell-wrap input[data-k="workDate"]::placeholder {
+      color: #555;
+      opacity: 1;
+    }
+    #tableWrap .detail-sheet .work-date-cal-label {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 26px;
+      flex-shrink: 0;
+      cursor: pointer;
+      border: 1px solid #bbb;
+      border-radius: 3px;
+      background: #f5f5f5;
+      box-sizing: border-box;
+    }
+    #tableWrap .detail-sheet .work-date-cal-label:hover { background: #eaeaea; }
+    #tableWrap .detail-sheet .work-date-cal-icon {
+      font-size: 14px;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    #tableWrap .detail-sheet .work-date-picker {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .actions { margin-top: 12px; display: flex; gap: 8px; }
+    button { padding: 8px 14px; cursor: pointer; }
+    .ref-wrap { margin-top: 12px; display: grid; grid-template-columns: 7fr 3fr; gap: 12px; }
+    .panel { border: 1px solid #ccc; padding: 8px; }
+    .panel h3 { margin: 0 0 8px 0; font-size: 14px; }
+    .drawing-layout { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .drawing-preview { height: 360px; border: 1px solid #ddd; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #666; font-size: 12px; }
+    .drawing-preview iframe, .drawing-preview img { width: 100%; height: 100%; border: 0; object-fit: contain; background: #fff; }
+    .footer-sheet { margin-top: 10px; border: 1px solid #333; font-size: 12px; }
+    .footer-grid { display: grid; grid-template-columns: 1fr 360px; min-height: 120px; }
+    .footer-remarks { border-right: 1px solid #333; padding: 8px; }
+    .footer-left { display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px; align-items: start; }
+    .footer-note { font-size: 12px; line-height: 1.5; }
+    .footer-note .ttl { font-weight: 600; margin-bottom: 2px; }
+    .footer-remarks .ttl { font-weight: 600; margin-bottom: 6px; }
+    .footer-remarks textarea { width: 100%; min-height: 82px; resize: vertical; box-sizing: border-box; font-size: 12px; }
+    .footer-sign table { height: 100%; }
+    .footer-sign th, .footer-sign td { border: 1px solid #333; }
+    .footer-sign input { border: 0; width: 100%; text-align: center; padding: 6px 4px; font-size: 12px; }
+    .footer-sign-placeholder { min-height: 36px; vertical-align: middle; }
+    .remarks-grid table { width: 100%; font-size: 12px; border-collapse: collapse; }
+    .remarks-grid th, .remarks-grid td { border: 1px solid #333; padding: 2px 4px; text-align: center; }
+    .remarks-grid td input { width: 100%; border: 0; padding: 4px; box-sizing: border-box; }
+    .footer-code { border-top: 1px solid #333; padding: 4px 8px; font-size: 11px; color: #333; }
+    #result { margin-top: 10px; white-space: pre-wrap; font-size: 12px; }
+    .admin-nav { margin: 0 0 10px; font-size: 12px; }
+    .admin-nav a { color: #06c; }
+    .print-root { display: none; }
+    .print-page { box-sizing: border-box; }
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        width: 100% !important;
+      }
+      .admin-nav { display: none !important; }
+      .screen-sheet { display: none !important; }
+      .print-root {
+        display: block !important;
+        box-sizing: border-box;
+        width: 100% !important;
+        max-width: none !important;
+        padding: 4mm 5mm;
+        margin: 0 !important;
+      }
+      .print-page {
+        box-sizing: border-box;
+        width: 100% !important;
+        max-width: none !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      .print-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .print-process-block {
+        display: block;
+        width: 100% !important;
+        max-width: none !important;
+      }
+      .print-page .print-table-area,
+      .print-page .sheet-table-scroll {
+        overflow: visible !important;
+        max-height: none !important;
+      }
+      .print-page .detail-sheet thead {
+        display: table-header-group;
+      }
+      .print-page .print-field-value {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        color: #000 !important;
+        background: transparent !important;
+      }
+      .print-page .header-sheet {
+        margin-bottom: 2mm !important;
+        width: 100% !important;
+      }
+      .print-page .header-main {
+        grid-template-columns: minmax(44mm, 0.88fr) minmax(0, 2.2fr) minmax(48mm, 0.95fr) !important;
+      }
+      .print-page .sign-yemi { font-size: 28px !important; padding: 2px 4px !important; }
+      .print-page .sign-pad-prep, .print-page .sign-pad-app { min-height: 20mm !important; }
+      .print-page .ref-wrap {
+        margin-top: 2mm !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 4mm !important;
+        width: 100% !important;
+      }
+      .print-page .drawing-preview {
+        height: 46mm !important;
+        min-height: 40mm !important;
+      }
+      .print-page .panel { padding: 2mm 3mm !important; }
+      .print-page .panel h3 { font-size: 11px !important; margin-bottom: 4px !important; }
+      .print-page .detail-sheet { font-size: 8px !important; width: 100% !important; }
+      .print-page .detail-sheet th,
+      .print-page .detail-sheet td { padding: 1px 2px !important; }
+      .print-page .detail-sheet input,
+      .print-page .detail-sheet select {
+        font-size: 8px !important;
+        padding: 1px 2px !important;
+        min-height: 0 !important;
+      }
+      .print-page .sheet-table-scroll { width: 100% !important; }
+      .print-page .footer-sheet {
+        margin-top: 3mm !important;
+        width: 100% !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .print-page .footer-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(52mm, 32%) !important;
+        min-height: 0 !important;
+        width: 100% !important;
+      }
+      .print-page button { display: none !important; }
+      .print-page .ref-wrap .panel + .panel table { font-size: 7px !important; }
+      .print-page .ref-wrap .panel + .panel th,
+      .print-page .ref-wrap .panel + .panel td { padding: 1px 2px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="printRoot" class="print-root" aria-hidden="true"></div>
+  <p class="admin-nav"><a href="/admin.html">Master data (parts, processes, drawings, point checks)</a></p>
+  <div class="screen-sheet">
+    <div class="header-sheet">
+    <div class="header-main">
+      <div class="header-col-brand">
+        <div class="brand-logo"><img src="/drawings/UACJ_logo.png" alt="UACJ"></div>
+        <div class="brand-name">PT YAN JIN INDONESIA</div>
+        <div class="dept">Production Department</div>
+      </div>
+      <div class="header-col-meta">
+        <div class="header-title-row"><h1>CHECK SHEET PRODUCTION</h1></div>
+        <div class="meta-box">
+          <div class="meta-row"><div class="k">Part Name</div><div class="c">:</div><div class="v part-dd"><select id="partNameSelect"></select></div></div>
+          <div class="meta-row"><div class="k">Part No</div><div class="c">:</div><div class="v part-pick"><select id="partNoSelect"></select></div></div>
+          <div class="meta-row"><div class="k">Eff date</div><div class="c">:</div><div class="v eff-ym"><select id="effYear" aria-label="Year (Gregorian)"></select><span class="eff-sep">/</span><select id="effMonth" aria-label="Month"></select><button type="button" id="loadSheetBtn">Load</button></div></div>
+          <div class="meta-row"><div class="k">Rev No</div><div class="c">:</div><div class="v"><input id="revNo" /></div></div>
+          <div class="meta-row"><div class="k">Process</div><div class="c">:</div><div class="v"><span id="headerProcessName">-</span></div></div>
+        </div>
+      </div>
+      <div class="sign-box">
+        <div class="sign-csno">CS No :</div>
+        <div class="sign-lbl-prep">Prepare</div>
+        <div class="sign-lbl-app">Approval</div>
+        <div class="sign-pad-prep"><input type="text" class="header-sign-input" id="preparedBy" autocomplete="name" /></div>
+        <div class="sign-pad-app"><input type="text" class="header-sign-input" id="approvedBy" autocomplete="name" /></div>
+        <div class="sign-yemi" id="headerCustomerAbbrev" aria-label="Customer abbrev"></div>
+      </div>
+    </div>
+  </div>
+  <div style="display:none;">
+    <label>Format</label><select id="format"></select>
+    <label>Department</label><input id="department" value="Production Department" />
+    <label>Sheet Date</label><input id="sheetDate" type="date" />
+    <label>Created By</label><input id="createdBy" value="operator01" />
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="ref-wrap">
+    <div class="panel">
+      <div class="drawing-layout">
+        <div id="drawingPreview" class="drawing-preview">Drawing preview</div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Point Check</h3>
+      <div id="pointCheckWrap"></div>
+    </div>
+  </div>
+  <div id="tableWrap"></div>
+  <div class="footer-sheet">
+    <div class="footer-grid">
+      <div class="footer-remarks">
+        <div class="footer-left">
+          <div class="footer-note">
+            <div class="ttl">Keterangan :</div>
+            <div>1. Beri tanda (&radic;) jika kondisi OK</div>
+            <div>2. Beri tanda (X) jika kondisi NG</div>
+          </div>
+          <div class="remarks-grid">
+            <table>
+              <thead>
+                <tr><th style="width:56px;">Rev</th><th>Remarks</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>1</td><td><input id="footerRemarks1" /></td></tr>
+                <tr><td>2</td><td><input id="footerRemarks2" /></td></tr>
+                <tr><td>3</td><td><input id="footerRemarks3" /></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="footer-sign">
+        <table>
+          <thead>
+            <tr><th>Di buat</th><th>Di check</th><th>Di setujui</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="footer-sign-placeholder" aria-hidden="true"></td>
+              <td><input id="checkedBy" /></td>
+              <td class="footer-sign-placeholder" aria-hidden="true"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="footer-code">FM-ASB-CS-001-00</div>
+  </div>
+  <div class="actions">
+    <button type="button" id="saveBtn">Save</button>
+    <button type="button" id="savePdfBtn">Save as PDF</button>
+  </div>
+  <div id="result"></div>
+  </div>
+
+  <script>
+    const today = new Date().toISOString().slice(0, 10);
+
+    function getEffDateIso() {
+      const y = document.getElementById("effYear").value;
+      const mo = document.getElementById("effMonth").value;
+      if (!y || !mo) return null;
+      return `${y}-${mo}-01`;
+    }
+
+    function initEffYearMonth() {
+      const ySel = document.getElementById("effYear");
+      const mSel = document.getElementById("effMonth");
+      const now = new Date();
+      const cy = now.getFullYear();
+      ySel.replaceChildren();
+      for (let yr = cy - 8; yr <= cy + 2; yr++) {
+        const o = document.createElement("option");
+        o.value = String(yr);
+        o.textContent = String(yr);
+        ySel.appendChild(o);
+      }
+      ySel.value = String(cy);
+      mSel.replaceChildren();
+      const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      for (let mo = 1; mo <= 12; mo++) {
+        const o = document.createElement("option");
+        const mv = String(mo).padStart(2, "0");
+        o.value = mv;
+        o.textContent = monthLabels[mo - 1];
+        mSel.appendChild(o);
+      }
+      mSel.value = String(now.getMonth() + 1).padStart(2, "0");
+    }
+
+    initEffYearMonth();
+    document.getElementById("sheetDate").value = today;
+    document.getElementById("effYear").addEventListener("change", () => {
+      state.editingHeaderId = null;
+    });
+    document.getElementById("effMonth").addEventListener("change", () => {
+      state.editingHeaderId = null;
+    });
+
+    const state = {
+      formats: [],
+      processes: [],
+      references: { drawings: [], pointChecks: [], customerAbbrev: null },
+      selectedDrawingIndex: 0,
+      selectedProcessIndex: 0,
+      rowsByProcess: {},
+      partNamesByNo: {},
+      editingHeaderId: null
+    };
+
+    function rowHasSheetData(r) {
+      const hasChecks = ["A", "B", "C", "D", "E", "F", "G"].some((code) => r.checks[code]);
+      const hasWorkDate = r.workDate != null && String(r.workDate).trim() !== "";
+      return (
+        hasChecks ||
+        hasWorkDate ||
+        r.startTime ||
+        r.finishTime ||
+        r.qty !== "" ||
+        r.okCount !== "" ||
+        r.ngCount !== "" ||
+        r.pic ||
+        r.leaderCheck ||
+        r.remarks
+      );
+    }
+
+    function getDrawingPreviewHtml(d) {
+      if (!d || !d.fileUrl) return "Drawing file URL is not set";
+      if (d.fileUrl.startsWith("excel://")) {
+        return "<div style='padding:8px;'>Loading Excel drawing…</div>";
+      }
+      const withCacheBuster = `${d.fileUrl}${d.fileUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      const url = d.fileUrl.toLowerCase();
+      if (url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".gif") || url.endsWith(".webp")) {
+        return `<img src="${withCacheBuster}" alt="${d.drawingNo || "drawing"}">`;
+      }
+      return `<iframe src="${withCacheBuster}" title="Drawing preview"></iframe>`;
+    }
+
+    function renderReferences() {
+      const drawingPreview = document.getElementById("drawingPreview");
+      const pointWrap = document.getElementById("pointCheckWrap");
+
+      const selectedProcess = state.processes[state.selectedProcessIndex];
+      const selectedProcessName = selectedProcess ? selectedProcess.processName : null;
+      const drawings = (state.references.drawings || []).filter((d) =>
+        !selectedProcessName || !d.processCode || d.processCode === selectedProcessName
+      );
+      if (!drawings.length) {
+        drawingPreview.textContent = "No reference drawing";
+      } else {
+        const processSpecific = drawings.find((d) => d.processCode === selectedProcessName);
+        const selected = processSpecific || drawings[0];
+        drawingPreview.innerHTML = getDrawingPreviewHtml(selected);
+        if (selected && selected.fileUrl && selected.fileUrl.startsWith("excel://")) {
+          const partNo = (selected.fileUrl.split("excel://")[1] || "").toUpperCase();
+          fetch(`/api/drawing-preview?partNo=${encodeURIComponent(partNo)}`)
+            .then((r) => r.json())
+            .then((data) => {
+              const table = `
+                <div style="font-size:12px;margin-bottom:6px;">${data.sheetName} - ${data.partNo}</div>
+                <div style="height:320px;overflow:auto;border:1px solid #ddd;background:#fff;">
+                  <table style="font-size:11px;">
+                    <thead><tr><th>#</th>${data.headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+                    <tbody>
+                      ${data.rows.map(r => `<tr><td>${r.rowNo}</td>${r.values.map(v => `<td style="text-align:left;min-width:60px;">${(v || "").replaceAll("<","&lt;").replaceAll(">","&gt;")}</td>`).join("")}</tr>`).join("")}
+                    </tbody>
+                  </table>
+                </div>`;
+              drawingPreview.innerHTML = table;
+            })
+            .catch(() => {
+              drawingPreview.innerHTML = "Failed to load Excel drawing";
+            });
+        }
+      }
+
+      const pointChecks = (state.references.pointChecks || []).filter((p) =>
+        !selectedProcessName || !p.processCode || p.processCode === selectedProcessName
+      );
+      if (!pointChecks.length) {
+        pointWrap.innerHTML = "<div style='font-size:12px;color:#777;'>No point checks</div>";
+      } else {
+        pointWrap.innerHTML = `<table>
+          <thead>
+            <tr><th>No</th><th colspan="2">Dimensi</th><th>Alat Bantu</th></tr>
+          </thead>
+          <tbody>
+            ${pointChecks.map(p => `<tr>
+              <td>${p.checkCode}</td>
+              <td style="text-align:left;">${p.pointCheckText || ""}</td>
+              <td style="text-align:left;">${p.criteria || ""}</td>
+              <td>${p.checkMethod || ""}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+        <div style="font-size:12px;margin-top:6px;color:#555;">${pointChecks.length} point check item(s)</div>`;
+      }
+
+      const hel = document.getElementById("headerCustomerAbbrev");
+      if (hel) {
+        const v = state.references && state.references.customerAbbrev;
+        hel.textContent = v != null && String(v).trim() !== "" ? String(v).trim() : "";
+      }
+    }
+
+
+    const EMPTY_CHECKS = () => ({ A: "", B: "", C: "", D: "", E: "", F: "", G: "" });
+
+    function normalizeWorkDateInput(raw) {
+      const s = String(raw || "").trim();
+      if (!s) return "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const m = s.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/);
+      if (m) {
+        return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+      }
+      return s;
+    }
+
+    function defaultRow(rowNo) {
+      return {
+        rowNo, workDate: "", startTime: "", finishTime: "", qty: "", okCount: "", ngCount: "", pic: "",
+        leaderCheck: "", remarks: "",
+        checks: EMPTY_CHECKS()
+      };
+    }
+
+    function ensureRowChecks(r) {
+      if (!r.checks || typeof r.checks !== "object") {
+        r.checks = EMPTY_CHECKS();
+        return r.checks;
+      }
+      const base = EMPTY_CHECKS();
+      for (const c of ["A", "B", "C", "D", "E", "F", "G"]) {
+        const t = String(r.checks[c] == null ? "" : r.checks[c]).trim();
+        base[c] = t === "OK" || t === "NG" ? t : "";
+      }
+      r.checks = base;
+      return r.checks;
+    }
+
+    async function loadFormats() {
+      const res = await fetch("/api/formats");
+      state.formats = await res.json();
+      const sel = document.getElementById("format");
+      sel.innerHTML = state.formats.map(f => `<option value="${f.formatId}">${f.formatCode} - ${f.formatName}</option>`).join("");
+    }
+
+    function renderTabs() {
+      const tabs = document.getElementById("tabs");
+      tabs.innerHTML = state.processes.map((p, i) =>
+        `<button class="tab ${i === state.selectedProcessIndex ? "active" : ""}" data-idx="${i}">${p.processName}</button>`
+      ).join("");
+      tabs.querySelectorAll(".tab").forEach(btn => {
+        btn.onclick = () => {
+          state.selectedProcessIndex = Number(btn.dataset.idx);
+          state.selectedDrawingIndex = 0;
+          renderTabs();
+          updateHeaderProcess();
+          renderReferences();
+          renderTable();
+        };
+      });
+    }
+
+    function updateHeaderProcess() {
+      const p = state.processes[state.selectedProcessIndex];
+      document.getElementById("headerProcessName").textContent = p ? p.processName : "-";
+    }
+
+    function renderTable() {
+      const wrap = document.getElementById("tableWrap");
+      if (!state.processes.length) {
+        wrap.innerHTML =
+          "<p style=\"font-size:12px;color:#666;margin:8px 0;\">Select part and Eff date (year / month). Use Load on the Eff date row to open that month's sheet, or load master data (processes, drawings, point checks) for new entry.</p>";
+        return;
+      }
+      const p = state.processes[state.selectedProcessIndex];
+      const key = p.processMasterId;
+      if (!state.rowsByProcess[key]) state.rowsByProcess[key] = Array.from({ length: 31 }, (_, i) => defaultRow(i + 1));
+      const rows = state.rowsByProcess[key];
+      for (const r of rows) ensureRowChecks(r);
+
+      wrap.innerHTML = `<div class="sheet-table-scroll"><table class="detail-sheet">
+          <colgroup>
+            <col span="15">
+            <col style="width:118px;">
+            <col style="width:260px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>No</th><th>Date</th><th>Start</th><th>Finish</th><th>Qty</th><th>OK</th><th>NG</th><th>PIC</th>
+              <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>Leader Check</th><th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((r, i) => {
+              const ck = r.checks;
+              const datePickVal = r.workDate && /^\d{4}-\d{2}-\d{2}$/.test(r.workDate) ? r.workDate : "";
+              return `
+              <tr>
+                <td>${r.rowNo}</td>
+                <td class="date-cell">
+                  <div class="date-cell-wrap">
+                    <input type="text" data-i="${i}" data-k="workDate" value="${r.workDate || ""}" placeholder="----/--/--" maxlength="10" autocomplete="off" />
+                    <label class="work-date-cal-label" title="Calendar" aria-label="Pick date">
+                      <span class="work-date-cal-icon" aria-hidden="true">&#128197;</span>
+                      <input type="date" class="work-date-picker" data-i="${i}" value="${datePickVal}" />
+                    </label>
+                  </div>
+                </td>
+                <td><input type="time" data-i="${i}" data-k="startTime" value="${r.startTime || ""}"></td>
+                <td><input type="time" data-i="${i}" data-k="finishTime" value="${r.finishTime || ""}"></td>
+                <td><input type="number" min="0" data-i="${i}" data-k="qty" value="${r.qty}"></td>
+                <td><input type="number" min="0" data-i="${i}" data-k="okCount" value="${r.okCount}"></td>
+                <td><input type="number" min="0" data-i="${i}" data-k="ngCount" value="${r.ngCount}"></td>
+                <td><input data-i="${i}" data-k="pic" value="${r.pic || ""}"></td>
+                ${["A","B","C","D","E","F","G"].map((code) => `
+                  <td class="check-col">
+                    <select data-i="${i}" data-k="check_${code}" aria-label="Check ${code}">
+                      <option value="" ${ck[code] === "" ? "selected" : ""}></option>
+                      <option value="OK" ${ck[code] === "OK" ? "selected" : ""}>OK</option>
+                      <option value="NG" ${ck[code] === "NG" ? "selected" : ""}>NG</option>
+                    </select>
+                  </td>
+                `).join("")}
+                <td><input style="width:100%;" data-i="${i}" data-k="leaderCheck" value="${r.leaderCheck || ""}"></td>
+                <td><input style="width:100%;" data-i="${i}" data-k="remarks" value="${r.remarks || ""}"></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table></div>`;
+
+      const syncCell = (el) => {
+        const i = Number(el.dataset.i);
+        const k = el.dataset.k;
+        if (k == null || Number.isNaN(i) || !rows[i]) return;
+        if (k.startsWith("check_")) {
+          ensureRowChecks(rows[i]);
+          rows[i].checks[k.replace("check_", "")] = el.value;
+        } else if (k === "workDate") {
+          const norm = normalizeWorkDateInput(el.value);
+          rows[i][k] = norm;
+          if (el.value !== norm) el.value = norm;
+          const picker = wrap.querySelector(`input.work-date-picker[data-i="${i}"]`);
+          if (picker) picker.value = norm && /^\d{4}-\d{2}-\d{2}$/.test(norm) ? norm : "";
+        } else {
+          rows[i][k] = el.value;
+        }
+      };
+
+      wrap.querySelectorAll("input.work-date-picker").forEach((picker) => {
+        picker.addEventListener("change", () => {
+          const idx = picker.dataset.i;
+          const textInp = wrap.querySelector(`input[data-k="workDate"][data-i="${idx}"]`);
+          if (textInp) {
+            textInp.value = picker.value || "";
+            syncCell(textInp);
+          }
+        });
+        picker.addEventListener("click", (e) => e.stopPropagation());
+      });
+
+      wrap.querySelectorAll("input,select").forEach((el) => {
+        if (el.classList.contains("work-date-picker")) return;
+        el.addEventListener("change", () => syncCell(el));
+        if (el.tagName === "SELECT") {
+          el.addEventListener("click", (e) => e.stopPropagation());
+        }
+      });
+    }
+
+    let syncingPartSelects = false;
+    function syncPartSelectsFromPartNo(partNo) {
+      syncingPartSelects = true;
+      document.getElementById("partNameSelect").value = partNo;
+      document.getElementById("partNoSelect").value = partNo;
+      syncingPartSelects = false;
+    }
+
+    function fillPartSelects(parts) {
+      const nameSel = document.getElementById("partNameSelect");
+      const noSel = document.getElementById("partNoSelect");
+      nameSel.replaceChildren();
+      noSel.replaceChildren();
+      const phN = document.createElement("option");
+      phN.value = "";
+      phN.textContent = "— Select —";
+      nameSel.appendChild(phN);
+      const phC = document.createElement("option");
+      phC.value = "";
+      phC.textContent = "— Select —";
+      noSel.appendChild(phC);
+      const nameCounts = {};
+      for (const p of parts) {
+        nameCounts[p.partName] = (nameCounts[p.partName] || 0) + 1;
+      }
+      for (const p of parts) {
+        state.partNamesByNo[p.partNo] = p.partName;
+        const nameLabel =
+          nameCounts[p.partName] > 1 ? `${p.partName} (${p.partNo})` : p.partName;
+        const on = document.createElement("option");
+        on.value = p.partNo;
+        on.textContent = nameLabel;
+        nameSel.appendChild(on);
+        const oc = document.createElement("option");
+        oc.value = p.partNo;
+        oc.textContent = p.partNo;
+        noSel.appendChild(oc);
+      }
+    }
+
+    async function loadPartOptions() {
+      const formatId = document.getElementById("format").value;
+      state.editingHeaderId = null;
+      state.partNamesByNo = {};
+      state.processes = [];
+      state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
+      state.selectedDrawingIndex = 0;
+      state.selectedProcessIndex = 0;
+      state.rowsByProcess = {};
+      fillPartSelects([]);
+      if (!formatId) {
+        renderTabs();
+        updateHeaderProcess();
+        renderReferences();
+        renderTable();
+        return;
+      }
+      const res = await fetch(`/api/formats/${formatId}/parts`);
+      const parts = await res.json();
+      if (!res.ok) {
+        document.getElementById("result").textContent = parts.message || JSON.stringify(parts);
+        renderTabs();
+        updateHeaderProcess();
+        renderReferences();
+        renderTable();
+        return;
+      }
+      fillPartSelects(parts);
+      renderTabs();
+      updateHeaderProcess();
+      renderReferences();
+      renderTable();
+      document.getElementById("result").textContent = "";
+    }
+
+    function fmtSheetDate(v) {
+      if (v == null || v === "") return "";
+      const s = typeof v === "string" ? v : String(v);
+      return s.length >= 10 ? s.slice(0, 10) : s;
+    }
+
+    function fmtSheetTime(v) {
+      if (v == null || v === "") return "";
+      if (typeof v === "object" && v instanceof Date && !Number.isNaN(v.getTime())) {
+        const h = v.getUTCHours();
+        const m = v.getUTCMinutes();
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      }
+      const s = String(v).trim();
+      const iso = s.match(/T(\d{2}):(\d{2})/);
+      if (iso) return `${iso[1]}:${iso[2]}`;
+      const hm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+      if (hm) return `${hm[1].padStart(2, "0")}:${hm[2]}`;
+      return "";
+    }
+
+    function applyLoadedChecksheet(detail) {
+      document.getElementById("revNo").value = detail.revNo || "";
+      if (detail.department) document.getElementById("department").value = detail.department;
+      const sd = fmtSheetDate(detail.sheetDate);
+      if (sd) document.getElementById("sheetDate").value = sd;
+      document.getElementById("preparedBy").value = detail.preparedBy || "";
+      document.getElementById("checkedBy").value = detail.checkedBy || "";
+      document.getElementById("approvedBy").value = detail.approvedBy || "";
+      document.getElementById("footerRemarks1").value = detail.footerRemarks1 || "";
+      document.getElementById("footerRemarks2").value = detail.footerRemarks2 || "";
+      document.getElementById("footerRemarks3").value = detail.footerRemarks3 || "";
+
+      const eff = fmtSheetDate(detail.effDate);
+      if (eff.length >= 10) {
+        const [y, m] = eff.split("-");
+        if (y && m) {
+          document.getElementById("effYear").value = y;
+          document.getElementById("effMonth").value = m.slice(0, 2).padStart(2, "0");
+        }
+      }
+
+      state.rowsByProcess = {};
+      for (const p of state.processes) {
+        const key = p.processMasterId;
+        const savedProc = (detail.processes || []).find((sp) => sp.processMasterId === p.processMasterId);
+        const rows = Array.from({ length: 31 }, (_, i) => defaultRow(i + 1));
+        if (savedProc && Array.isArray(savedProc.rows)) {
+          for (const sr of savedProc.rows) {
+            const idx = sr.rowNo - 1;
+            if (idx < 0 || idx > 30) continue;
+            const checks = { A: "", B: "", C: "", D: "", E: "", F: "", G: "" };
+            for (const c of sr.checks || []) {
+              if (c && c.checkCode && Object.prototype.hasOwnProperty.call(checks, c.checkCode)) {
+                checks[c.checkCode] = c.result || "";
+              }
+            }
+            rows[idx] = {
+              rowNo: sr.rowNo,
+              workDate: fmtSheetDate(sr.workDate) || "",
+              startTime: fmtSheetTime(sr.startTime),
+              finishTime: fmtSheetTime(sr.finishTime),
+              qty: sr.qty != null ? String(sr.qty) : "",
+              okCount: sr.okCount != null ? String(sr.okCount) : "",
+              ngCount: sr.ngCount != null ? String(sr.ngCount) : "",
+              pic: sr.pic || "",
+              leaderCheck: sr.leaderCheck || "",
+              remarks: sr.remarks || "",
+              checks
+            };
+          }
+        }
+        state.rowsByProcess[key] = rows;
+      }
+    }
+
+    async function loadSheet() {
+      const formatId = document.getElementById("format").value;
+      const partNo = document.getElementById("partNoSelect").value;
+      const effDate = getEffDateIso();
+      if (!partNo) {
+        document.getElementById("result").textContent = "Select a part (Part Name or Part No), then press Load.";
+        return;
+      }
+      if (!effDate) {
+        document.getElementById("result").textContent = "Select Eff date (year and month), then press Load.";
+        return;
+      }
+      document.getElementById("result").textContent = "Loading…";
+      const [processRes, refRes] = await Promise.all([
+        fetch(`/api/formats/${formatId}/processes?partNo=${encodeURIComponent(partNo)}`),
+        fetch(`/api/references?formatId=${formatId}&partNo=${encodeURIComponent(partNo)}`)
+      ]);
+      const processData = await processRes.json();
+      const refData = await refRes.json();
+      if (!processRes.ok) {
+        document.getElementById("result").textContent = processData.message || JSON.stringify(processData);
+        state.editingHeaderId = null;
+        state.processes = [];
+        state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
+        state.rowsByProcess = {};
+        renderTabs();
+        updateHeaderProcess();
+        renderReferences();
+        renderTable();
+        return;
+      }
+      if (!refRes.ok) {
+        document.getElementById("result").textContent = refData.message || JSON.stringify(refData);
+        state.editingHeaderId = null;
+        state.processes = [];
+        state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
+        state.rowsByProcess = {};
+        renderTabs();
+        updateHeaderProcess();
+        renderReferences();
+        renderTable();
+        return;
+      }
+      state.processes = processData;
+      state.references = refData;
+      state.selectedDrawingIndex = 0;
+      state.selectedProcessIndex = 0;
+      state.rowsByProcess = {};
+      renderTabs();
+      updateHeaderProcess();
+      renderReferences();
+
+      const monthRes = await fetch(
+        `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNo)}&effDate=${encodeURIComponent(effDate)}`
+      );
+      if (monthRes.ok) {
+        const detail = await monthRes.json();
+        applyLoadedChecksheet(detail);
+        state.editingHeaderId = detail.headerId;
+        document.getElementById("result").textContent = `Loaded saved sheet (headerId=${detail.headerId}). Save again to update.`;
+      } else if (monthRes.status === 404) {
+        state.editingHeaderId = null;
+        document.getElementById("result").textContent =
+          "No saved data for this month and part. Showing master data for new entry. Save will create a new sheet.";
+      } else {
+        state.editingHeaderId = null;
+        const err = await monthRes.json().catch(() => ({}));
+        document.getElementById("result").textContent = err.message || `for-month status=${monthRes.status}`;
+      }
+
+      renderTable();
+    }
+
+    function toNum(v) { return v === "" ? null : Number(v); }
+
+    function normalizeTimeForSave(v) {
+      if (v == null) return null;
+      const s = String(v).trim();
+      return s === "" ? null : s;
+    }
+
+    function stripAllIds(root) {
+      if (root.nodeType === 1 && root.id) root.removeAttribute("id");
+      root.querySelectorAll?.("[id]").forEach((el) => el.removeAttribute("id"));
+    }
+
+    function syncCloneValuesFromLiveByIds(cloneRoot, ids) {
+      for (const id of ids) {
+        const liveEl = document.getElementById(id);
+        if (!liveEl) continue;
+        const cloneEl = cloneRoot.querySelector("#" + id);
+        if (!cloneEl) continue;
+        const tag = cloneEl.tagName;
+        if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") {
+          cloneEl.value = liveEl.value;
+        }
+      }
+    }
+
+    function syncPrintClonesFromLive(headerClone, footerClone) {
+      syncCloneValuesFromLiveByIds(headerClone, [
+        "partNameSelect",
+        "partNoSelect",
+        "effYear",
+        "effMonth",
+        "revNo",
+        "preparedBy",
+        "approvedBy"
+      ]);
+      syncCloneValuesFromLiveByIds(footerClone, ["checkedBy", "footerRemarks1", "footerRemarks2", "footerRemarks3"]);
+    }
+
+    function getSelectDisplayText(sel) {
+      if (!sel || sel.value === "") return "";
+      const i = sel.selectedIndex;
+      if (i >= 0 && sel.options[i]) return sel.options[i].textContent.trim();
+      if (sel.selectedOptions && sel.selectedOptions[0]) return sel.selectedOptions[0].textContent.trim();
+      return String(sel.value);
+    }
+
+    function materializeFormControlsForPrint(root) {
+      root.querySelectorAll(".work-date-cal-label").forEach((n) => n.remove());
+      root.querySelectorAll("select").forEach((sel) => {
+        const text = getSelectDisplayText(sel);
+        const span = document.createElement("span");
+        span.className = "print-field-value";
+        span.textContent = text;
+        span.style.cssText =
+          "display:inline-block;width:100%;text-align:center;font:inherit;box-sizing:border-box;";
+        sel.replaceWith(span);
+      });
+      root.querySelectorAll("input").forEach((inp) => {
+        const t = (inp.type || "").toLowerCase();
+        if (t === "hidden" || t === "button" || t === "submit" || t === "image") return;
+        if (inp.classList.contains("work-date-picker")) return;
+        const span = document.createElement("span");
+        span.className = "print-field-value";
+        const wd = inp.dataset.k === "workDate" && !String(inp.value || "").trim();
+        span.textContent = wd ? "----/--/--" : inp.value || "";
+        span.style.cssText =
+          "display:inline-block;width:100%;text-align:center;font:inherit;box-sizing:border-box;min-height:1.15em;border-bottom:1px solid #bbb;padding:1px 2px;";
+        inp.replaceWith(span);
+      });
+    }
+
+    async function saveAsPdf() {
+      if (!state.processes.length) {
+        document.getElementById("result").textContent =
+          "No processes to print for PDF. Select a part and load master (or a saved sheet) with Load.";
+        return;
+      }
+      const root = document.getElementById("printRoot");
+      const prevIdx = state.selectedProcessIndex;
+      root.replaceChildren();
+
+      for (let i = 0; i < state.processes.length; i++) {
+        state.selectedProcessIndex = i;
+        updateHeaderProcess();
+        renderReferences();
+        renderTable();
+        await new Promise((r) => setTimeout(r, 450));
+
+        const page = document.createElement("div");
+        page.className = "print-page";
+
+        const hs = document.querySelector(".screen-sheet .header-sheet").cloneNode(true);
+        const rw = document.querySelector(".screen-sheet .ref-wrap").cloneNode(true);
+        const tw = document.querySelector(".screen-sheet #tableWrap").cloneNode(true);
+        const fs = document.querySelector(".screen-sheet .footer-sheet").cloneNode(true);
+
+        syncPrintClonesFromLive(hs, fs);
+        [hs, rw, tw, fs].forEach(stripAllIds);
+        tw.classList.add("print-table-area");
+
+        const block = document.createElement("div");
+        block.className = "print-process-block";
+        block.appendChild(hs);
+        block.appendChild(rw);
+        block.appendChild(tw);
+        block.appendChild(fs);
+        materializeFormControlsForPrint(block);
+        page.appendChild(block);
+        root.appendChild(page);
+      }
+
+      state.selectedProcessIndex = prevIdx;
+      updateHeaderProcess();
+      renderReferences();
+      renderTable();
+
+      const onAfterPrint = () => {
+        root.replaceChildren();
+        window.removeEventListener("afterprint", onAfterPrint);
+      };
+      window.addEventListener("afterprint", onAfterPrint);
+      document.getElementById("result").textContent =
+        "In the print dialog, choose Save as PDF or Microsoft Print to PDF. Each process prints all detail rows and inputs (long processes may span multiple pages).";
+      window.print();
+    }
+
+    async function saveSheet() {
+      const formatId = Number(document.getElementById("format").value);
+      const partNo = document.getElementById("partNoSelect").value;
+      const partName = state.partNamesByNo[partNo] || partNo;
+      if (!partNo) {
+        document.getElementById("result").textContent = "Select a part and use Load on the Eff date row to load master (or an existing sheet) before saving.";
+        return;
+      }
+      if (!getEffDateIso()) {
+        document.getElementById("result").textContent = "Select Eff date (year and month).";
+        return;
+      }
+      const payload = {
+        formatId,
+        partNo,
+        partName,
+        effDate: getEffDateIso(),
+        revNo: document.getElementById("revNo").value || null,
+        department: document.getElementById("department").value || null,
+        sheetDate: document.getElementById("sheetDate").value || null,
+        createdBy: document.getElementById("createdBy").value || null,
+        preparedBy: document.getElementById("preparedBy").value || null,
+        checkedBy: document.getElementById("checkedBy").value || null,
+        approvedBy: document.getElementById("approvedBy").value || null,
+        footerRemarks1: document.getElementById("footerRemarks1").value || null,
+        footerRemarks2: document.getElementById("footerRemarks2").value || null,
+        footerRemarks3: document.getElementById("footerRemarks3").value || null,
+        processes: state.processes.map(p => {
+          const rows = (state.rowsByProcess[p.processMasterId] || []).filter((r) => rowHasSheetData(r));
+          return {
+            processMasterId: p.processMasterId,
+            processName: p.processName,
+            displayOrder: p.displayOrder,
+            rows: rows.map(r => ({
+              rowNo: r.rowNo,
+              workDate: r.workDate || null,
+              startTime: normalizeTimeForSave(r.startTime),
+              finishTime: normalizeTimeForSave(r.finishTime),
+              qty: toNum(r.qty),
+              okCount: toNum(r.okCount),
+              ngCount: toNum(r.ngCount),
+              pic: r.pic || null,
+              leaderCheck: r.leaderCheck || null,
+              remarks: r.remarks || null,
+              checks: ["A","B","C","D","E","F","G"]
+                .filter(code => r.checks[code])
+                .map(code => ({ checkCode: code, result: r.checks[code] }))
+            }))
+          };
+        })
+      };
+
+      const url = state.editingHeaderId
+        ? `/api/checksheets/${state.editingHeaderId}`
+        : "/api/checksheets";
+      const method = state.editingHeaderId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const text = await res.text();
+      document.getElementById("result").textContent = `status=${res.status}\n${text}`;
+      try {
+        const data = JSON.parse(text);
+        if (res.ok && data.headerId != null) state.editingHeaderId = data.headerId;
+        if (res.status === 409) state.editingHeaderId = null;
+      } catch (_e) {}
+    }
+
+    document.getElementById("format").onchange = loadPartOptions;
+    document.getElementById("partNameSelect").onchange = () => {
+      if (syncingPartSelects) return;
+      state.editingHeaderId = null;
+      if (state.references) state.references.customerAbbrev = null;
+      const hel = document.getElementById("headerCustomerAbbrev");
+      if (hel) hel.textContent = "";
+      syncPartSelectsFromPartNo(document.getElementById("partNameSelect").value);
+    };
+    document.getElementById("partNoSelect").onchange = () => {
+      if (syncingPartSelects) return;
+      state.editingHeaderId = null;
+      if (state.references) state.references.customerAbbrev = null;
+      const hel = document.getElementById("headerCustomerAbbrev");
+      if (hel) hel.textContent = "";
+      syncPartSelectsFromPartNo(document.getElementById("partNoSelect").value);
+    };
+    document.getElementById("loadSheetBtn").onclick = () => loadSheet();
+    document.getElementById("saveBtn").onclick = saveSheet;
+    document.getElementById("savePdfBtn").onclick = () => {
+      saveAsPdf().catch((e) => {
+        document.getElementById("result").textContent = String(e && e.message ? e.message : e);
+      });
+    };
+    loadFormats().then(loadPartOptions);
+  </script>
+</body>
+</html>

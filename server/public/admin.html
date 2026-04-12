@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QC Check — Master data</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; max-width: 1200px; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    .sub { color: #555; font-size: 13px; margin-bottom: 16px; }
+    a { color: #06c; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #333; margin-bottom: 4px; }
+    input, select, textarea { padding: 6px 8px; font-size: 14px; box-sizing: border-box; }
+    button { padding: 8px 14px; cursor: pointer; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    th { background: #f0f0f0; }
+    .muted { color: #666; font-size: 12px; }
+    .panel { border: 1px solid #ddd; padding: 12px; margin-top: 16px; border-radius: 4px; }
+    .panel h2 { margin: 0 0 10px; font-size: 16px; }
+    .err { color: #b00; font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+    .ok { color: #060; font-size: 13px; margin-top: 8px; }
+    .btn-del { color: #a00; border-color: #c99; }
+    code { font-size: 12px; background: #f5f5f5; padding: 1px 4px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Master data (parts, processes, drawings, point checks)</h1>
+  <p class="sub">
+    Data is stored in <code>format_process_master</code>, <code>drawing_reference</code>, and <code>point_check_reference</code>.
+    Open the entry screen from <a href="/">QC Check Entry</a>.
+  </p>
+
+  <div class="row">
+    <div>
+      <label for="formatSel">Format</label>
+      <select id="formatSel"></select>
+    </div>
+    <button type="button" id="reloadCatalog">Reload catalog</button>
+  </div>
+  <div id="catalogMsg" class="err" style="display:none;"></div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Registered parts</h2>
+      <table id="partsTable">
+        <thead><tr><th>Part No</th><th>Part Name</th><th>Processes</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Add new part</h2>
+      <p class="muted">Part name is stored on the assembly drawing row (blank process). You can set the first process name.</p>
+      <div class="row">
+        <div><label>Part No</label><input id="newPartNo" placeholder="e.g. VDK1000" style="width:140px;" /></div>
+        <div><label>Part Name</label><input id="newPartName" placeholder="e.g. NEW COVER" style="width:220px;" /></div>
+        <div><label>First process name</label><input id="newFirstProc" value="SHEARING" style="width:180px;" /></div>
+        <button type="button" id="btnAddPart">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="detailPanel" class="panel" style="display:none;">
+    <h2>Part detail: <span id="detailPartLabel"></span></h2>
+    <p class="muted">Changing display name (Part Name) updates the assembly drawing name only.</p>
+    <div class="row">
+      <div><label>Display name (Part Name)</label><input id="editPartName" style="width:280px;" /></div>
+      <button type="button" id="btnSavePartName">Save name</button>
+    </div>
+    <div class="row">
+      <div><label>Customer abbrev (header)</label><input id="editCustomerAbbrev" placeholder="e.g. YEMI" style="width:140px;" maxlength="50" /></div>
+      <button type="button" id="btnSaveCustomerAbbrev">Save</button>
+    </div>
+    <p class="muted">Shown on the entry screen header after Load. Clear the field and Save to remove.</p>
+
+    <h3 style="margin-top:16px;">Processes</h3>
+    <table id="procTable">
+      <thead><tr><th>ID</th><th>Process name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:8px;">
+      <div><label>New process name</label><input id="newProcName" placeholder="e.g. BENDING 1/2" style="width:220px;" /></div>
+      <button type="button" id="btnAddProc">Add process</button>
+    </div>
+
+    <h3 style="margin-top:20px;">Drawings (drawing_reference)</h3>
+    <p class="muted">Blank <code>processCode</code> = part-wide. URL example: <code>/drawings/xxx.png</code></p>
+    <table id="drawTable">
+      <thead><tr><th>ID</th><th>Process</th><th>Drawing No</th><th>Name</th><th>fileUrl</th><th>Active</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:8px;">
+      <div><label>Process (blank = common)</label><input id="drProc" placeholder="SHEARING" style="width:140px;" /></div>
+      <div><label>drawingNo</label><input id="drNo" style="width:120px;" /></div>
+      <div><label>drawingName</label><input id="drName" style="width:180px;" /></div>
+      <div><label>fileUrl</label><input id="drUrl" style="width:220px;" /></div>
+      <button type="button" id="btnAddDr">Add</button>
+    </div>
+
+    <h3 style="margin-top:20px;">Point checks (point_check_reference)</h3>
+    <table id="pcTable">
+      <thead><tr><th>ID</th><th>Process</th><th>Code</th><th>Text</th><th>Criteria</th><th>Method</th><th>Active</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:8px;">
+      <div><label>Process (blank = common)</label><input id="pcProc" style="width:140px;" /></div>
+      <div><label>Code A–G</label><select id="pcCode" style="width:60px;"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
+      <div><label>Text</label><input id="pcText" style="width:200px;" /></div>
+      <div><label>Criteria</label><input id="pcCrit" style="width:140px;" /></div>
+      <div><label>Method</label><input id="pcMethod" style="width:120px;" /></div>
+      <button type="button" id="btnAddPc">Add</button>
+    </div>
+  </div>
+
+  <div id="detailMsg" class="err" style="display:none;"></div>
+  <div id="detailOk" class="ok" style="display:none;"></div>
+
+  <script>
+    let formats = [];
+    let formatId = null;
+    let selectedPart = null;
+    let catalogParts = [];
+
+    function showErr(elId, msg) {
+      const el = document.getElementById(elId);
+      el.style.display = msg ? "block" : "none";
+      el.textContent = msg || "";
+    }
+
+    async function loadFormats() {
+      const res = await fetch("/api/formats");
+      formats = await res.json();
+      const sel = document.getElementById("formatSel");
+      sel.innerHTML = formats.map(f => `<option value="${f.formatId}">${f.formatCode} — ${f.formatName}</option>`).join("");
+      if (formats.length) {
+        formatId = formats[0].formatId;
+        sel.value = String(formatId);
+      }
+    }
+
+    async function loadCatalog() {
+      showErr("catalogMsg", "");
+      if (!formatId) return;
+      const res = await fetch(`/api/admin/catalog?formatId=${encodeURIComponent(formatId)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        showErr("catalogMsg", data.message || JSON.stringify(data));
+        return;
+      }
+      catalogParts = data.parts || [];
+      const tb = document.querySelector("#partsTable tbody");
+      tb.innerHTML = catalogParts.map(p => `
+        <tr>
+          <td>${escapeHtml(p.partNo)}</td>
+          <td>${escapeHtml(p.partName)}</td>
+          <td>${p.processes ? p.processes.length : 0}</td>
+          <td class="row-actions"><button type="button" class="openPart" data-part="${escapeHtml(p.partNo)}">Open</button> <button type="button" class="delPart btn-del" data-part="${escapeHtml(p.partNo)}">Delete</button></td>
+        </tr>
+      `).join("");
+      tb.querySelectorAll(".openPart").forEach(btn => {
+        btn.onclick = () => openPart(btn.dataset.part);
+      });
+      tb.querySelectorAll(".delPart").forEach(btn => {
+        btn.onclick = () => deletePartFromCatalog(btn.dataset.part);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
+    async function deletePartFromCatalog(partNo) {
+      const msg = `Delete part "${partNo}" and ALL related data (processes, drawings, point checks, customer abbrev, and every saved checksheet for this part)? This cannot be undone.`;
+      if (!confirm(msg)) return;
+      showErr("catalogMsg", "");
+      const res = await fetch(
+        `/api/admin/parts/${encodeURIComponent(partNo)}?formatId=${encodeURIComponent(formatId)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr("catalogMsg", data.message || res.status);
+        return;
+      }
+      if (selectedPart === partNo) {
+        selectedPart = null;
+        document.getElementById("detailPanel").style.display = "none";
+      }
+      await loadCatalog();
+    }
+
+    async function openPart(partNo) {
+      selectedPart = partNo;
+      document.getElementById("detailPanel").style.display = "block";
+      document.getElementById("detailPartLabel").textContent = partNo;
+      const p = catalogParts.find(x => x.partNo === partNo);
+      document.getElementById("editPartName").value = p ? p.partName : "";
+      showErr("detailMsg", "");
+      showErr("detailOk", "");
+      document.getElementById("detailOk").style.display = "none";
+      await refreshDetail();
+    }
+
+    async function refreshDetail() {
+      if (!formatId || !selectedPart) return;
+      showErr("detailMsg", "");
+      const res = await fetch(`/api/admin/part-detail?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(selectedPart)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        showErr("detailMsg", data.message || JSON.stringify(data));
+        return;
+      }
+
+      document.getElementById("editCustomerAbbrev").value = data.customerAbbrev != null ? data.customerAbbrev : "";
+
+      const p = catalogParts.find(x => x.partNo === selectedPart);
+      const procs = p ? p.processes : [];
+      document.querySelector("#procTable tbody").innerHTML = procs.map(pr => `
+        <tr data-pid="${pr.processMasterId}">
+          <td>${pr.processMasterId}</td>
+          <td><input value="${escapeHtml(pr.processName)}" class="pname" style="width:100%;min-width:160px;" /></td>
+          <td>${pr.displayOrder}</td>
+          <td><input type="checkbox" class="pact" ${pr.activeFlag ? "checked" : ""} /></td>
+          <td class="row-actions"><button type="button" class="saveProc">Save</button> <button type="button" class="delProc btn-del">Delete</button></td>
+        </tr>
+      `).join("");
+      document.querySelectorAll(".saveProc").forEach((btn, i) => {
+        const tr = btn.closest("tr");
+        btn.onclick = () => saveProcRow(tr);
+      });
+      document.querySelectorAll(".delProc").forEach((btn) => {
+        btn.onclick = () => deleteProcRow(btn.closest("tr"));
+      });
+
+      document.querySelector("#drawTable tbody").innerHTML = (data.drawings || []).map(d => `
+        <tr data-did="${d.drawingRefId}">
+          <td>${d.drawingRefId}</td>
+          <td><input value="${d.processCode == null ? "" : escapeHtml(d.processCode)}" class="dproc" style="width:120px;" /></td>
+          <td><input value="${escapeHtml(d.drawingNo)}" class="dno" style="width:100px;" /></td>
+          <td><input value="${escapeHtml(d.drawingName || "")}" class="dname" style="width:140px;" /></td>
+          <td><input value="${escapeHtml(d.fileUrl || "")}" class="durl" style="width:200px;" /></td>
+          <td><input type="checkbox" class="dact" ${d.activeFlag ? "checked" : ""} /></td>
+          <td class="row-actions"><button type="button" class="saveDr">Save</button> <button type="button" class="delDr btn-del">Delete</button></td>
+        </tr>
+      `).join("");
+      document.querySelectorAll(".saveDr").forEach(btn => {
+        btn.onclick = () => {
+          const tr = btn.closest("tr");
+          saveDrawingRow(tr);
+        };
+      });
+      document.querySelectorAll(".delDr").forEach((btn) => {
+        btn.onclick = () => deleteDrawingRow(btn.closest("tr"));
+      });
+
+      document.querySelector("#pcTable tbody").innerHTML = (data.pointChecks || []).map(c => `
+        <tr data-pcid="${c.pointCheckRefId}">
+          <td>${c.pointCheckRefId}</td>
+          <td><input value="${c.processCode == null ? "" : escapeHtml(c.processCode)}" class="pcproc" style="width:120px;" /></td>
+          <td><input value="${escapeHtml(c.checkCode)}" class="pccode" style="width:36px;" maxlength="1" /></td>
+          <td><input value="${escapeHtml(c.pointCheckText || "")}" class="pctext" style="width:180px;" /></td>
+          <td><input value="${escapeHtml(c.criteria || "")}" class="pccrit" style="width:120px;" /></td>
+          <td><input value="${escapeHtml(c.checkMethod || "")}" class="pcmet" style="width:100px;" /></td>
+          <td><input type="checkbox" class="pcact" ${c.activeFlag ? "checked" : ""} /></td>
+          <td class="row-actions"><button type="button" class="savePc">Save</button> <button type="button" class="delPc btn-del">Delete</button></td>
+        </tr>
+      `).join("");
+      document.querySelectorAll(".savePc").forEach(btn => {
+        btn.onclick = () => savePcRow(btn.closest("tr"));
+      });
+      document.querySelectorAll(".delPc").forEach((btn) => {
+        btn.onclick = () => deletePcRow(btn.closest("tr"));
+      });
+    }
+
+    async function saveProcRow(tr) {
+      const id = tr.dataset.pid;
+      const processName = tr.querySelector(".pname").value.trim();
+      const activeFlag = tr.querySelector(".pact").checked;
+      const res = await fetch(`/api/admin/processes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processName, activeFlag })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk();
+      await loadCatalog();
+      await openPart(selectedPart);
+    }
+
+    async function saveDrawingRow(tr) {
+      const id = tr.dataset.did;
+      const processCode = tr.querySelector(".dproc").value.trim() || null;
+      const drawingNo = tr.querySelector(".dno").value.trim();
+      const drawingName = tr.querySelector(".dname").value.trim() || null;
+      const fileUrl = tr.querySelector(".durl").value.trim() || null;
+      const activeFlag = tr.querySelector(".dact").checked;
+      const res = await fetch(`/api/admin/drawings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processCode, drawingNo, drawingName, fileUrl, activeFlag })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk();
+      await refreshDetail();
+    }
+
+    async function savePcRow(tr) {
+      const id = tr.dataset.pcid;
+      const processCode = tr.querySelector(".pcproc").value.trim() || null;
+      const checkCode = tr.querySelector(".pccode").value.trim();
+      const pointCheckText = tr.querySelector(".pctext").value.trim();
+      const criteria = tr.querySelector(".pccrit").value.trim() || null;
+      const checkMethod = tr.querySelector(".pcmet").value.trim() || null;
+      const activeFlag = tr.querySelector(".pcact").checked;
+      const res = await fetch(`/api/admin/point-checks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processCode, checkCode, pointCheckText, criteria, checkMethod, activeFlag })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk();
+      await refreshDetail();
+    }
+
+    async function deleteProcRow(tr) {
+      if (!confirm("Delete this process?")) return;
+      const id = tr.dataset.pid;
+      const res = await fetch(
+        `/api/admin/processes/${id}?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(selectedPart)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk("Deleted");
+      await loadCatalog();
+      await openPart(selectedPart);
+    }
+
+    async function deleteDrawingRow(tr) {
+      if (!confirm("Delete this drawing row?")) return;
+      const id = tr.dataset.did;
+      const res = await fetch(
+        `/api/admin/drawings/${id}?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(selectedPart)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk("Deleted");
+      await refreshDetail();
+    }
+
+    async function deletePcRow(tr) {
+      if (!confirm("Delete this point check?")) return;
+      const id = tr.dataset.pcid;
+      const res = await fetch(
+        `/api/admin/point-checks/${id}?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(selectedPart)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk("Deleted");
+      await refreshDetail();
+    }
+
+    function flashOk(message) {
+      const el = document.getElementById("detailOk");
+      el.style.display = "block";
+      el.textContent = message || "Saved";
+      setTimeout(() => { el.style.display = "none"; }, 2000);
+    }
+
+    document.getElementById("formatSel").onchange = () => {
+      formatId = Number(document.getElementById("formatSel").value);
+      selectedPart = null;
+      document.getElementById("detailPanel").style.display = "none";
+      loadCatalog();
+    };
+
+    document.getElementById("reloadCatalog").onclick = loadCatalog;
+
+    document.getElementById("btnAddPart").onclick = async () => {
+      showErr("catalogMsg", "");
+      const partNo = document.getElementById("newPartNo").value.trim();
+      const partName = document.getElementById("newPartName").value.trim();
+      const firstProcessName = document.getElementById("newFirstProc").value.trim();
+      const res = await fetch("/api/admin/parts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formatId, partNo, partName, firstProcessName })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr("catalogMsg", data.message || JSON.stringify(data));
+        return;
+      }
+      document.getElementById("newPartNo").value = "";
+      document.getElementById("newPartName").value = "";
+      await loadCatalog();
+    };
+
+    document.getElementById("btnSavePartName").onclick = async () => {
+      showErr("detailMsg", "");
+      const partName = document.getElementById("editPartName").value.trim();
+      const res = await fetch(`/api/admin/parts/${encodeURIComponent(selectedPart)}/name?formatId=${encodeURIComponent(formatId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partName })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk();
+      await loadCatalog();
+      await openPart(selectedPart);
+    };
+
+    document.getElementById("btnSaveCustomerAbbrev").onclick = async () => {
+      showErr("detailMsg", "");
+      const customerAbbrev = document.getElementById("editCustomerAbbrev").value.trim();
+      const res = await fetch(`/api/admin/parts/${encodeURIComponent(selectedPart)}/customer?formatId=${encodeURIComponent(formatId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerAbbrev })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      flashOk();
+      await refreshDetail();
+    };
+
+    document.getElementById("btnAddProc").onclick = async () => {
+      const processName = document.getElementById("newProcName").value.trim();
+      if (!processName) return;
+      const res = await fetch("/api/admin/processes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formatId, partNo: selectedPart, processName })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      document.getElementById("newProcName").value = "";
+      flashOk();
+      await loadCatalog();
+      await openPart(selectedPart);
+    };
+
+    document.getElementById("btnAddDr").onclick = async () => {
+      const processCode = document.getElementById("drProc").value.trim() || null;
+      const drawingNo = document.getElementById("drNo").value.trim();
+      const drawingName = document.getElementById("drName").value.trim() || null;
+      const fileUrl = document.getElementById("drUrl").value.trim() || null;
+      if (!drawingNo) { showErr("detailMsg", "drawingNo is required"); return; }
+      const res = await fetch("/api/admin/drawings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formatId, partNo: selectedPart, processCode, drawingNo, drawingName, fileUrl })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      document.getElementById("drNo").value = "";
+      document.getElementById("drName").value = "";
+      document.getElementById("drUrl").value = "";
+      flashOk();
+      await refreshDetail();
+    };
+
+    document.getElementById("btnAddPc").onclick = async () => {
+      const processCode = document.getElementById("pcProc").value.trim() || null;
+      const checkCode = document.getElementById("pcCode").value;
+      const pointCheckText = document.getElementById("pcText").value.trim();
+      const criteria = document.getElementById("pcCrit").value.trim() || null;
+      const checkMethod = document.getElementById("pcMethod").value.trim() || null;
+      if (!pointCheckText) { showErr("detailMsg", "Text is required"); return; }
+      const res = await fetch("/api/admin/point-checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formatId, partNo: selectedPart, processCode, checkCode, pointCheckText, criteria, checkMethod })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+      document.getElementById("pcText").value = "";
+      document.getElementById("pcCrit").value = "";
+      document.getElementById("pcMethod").value = "";
+      flashOk();
+      await refreshDetail();
+    };
+
+    (async () => {
+      await loadFormats();
+      await loadCatalog();
+    })();
+  </script>
+</body>
+</html>
