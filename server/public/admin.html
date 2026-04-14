@@ -84,6 +84,30 @@
       color: var(--muted);
       font-size: 12px;
     }
+    .file-pick {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .file-name {
+      color: var(--muted);
+      font-size: 12px;
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } .brand-logo { height: 36px; } }
   </style>
 </head>
@@ -117,7 +141,14 @@
       <div><label>Company name</label><input id="brandCompany" placeholder="e.g. PT YAN JIN INDONESIA" style="width:320px;" maxlength="200" /></div>
       <div><label>Department name</label><input id="brandDept" placeholder="e.g. Production Department" style="width:260px;" maxlength="200" /></div>
       <div><label>Logo URL</label><input id="brandLogo" placeholder="e.g. /drawings/UACJ_logo.png" style="width:320px;" maxlength="500" /></div>
-      <div><label>Logo file</label><input id="brandLogoFile" type="file" accept="image/*" style="width:260px;" /></div>
+      <div>
+        <label>Logo file</label>
+        <div class="file-pick">
+          <input id="brandLogoFile" class="visually-hidden" type="file" accept="image/*" />
+          <button type="button" id="pickBrandLogoFile">Choose file</button>
+          <span id="brandLogoFileName" class="file-name">No file chosen</span>
+        </div>
+      </div>
       <button type="button" id="btnUploadBrandLogo">Upload logo</button>
       <button type="button" id="btnSaveBranding">Save header master</button>
     </div>
@@ -140,11 +171,9 @@
     </div>
     <div class="panel">
       <h2>Add new part</h2>
-      <p class="muted">Part name is stored in part master. You can set the first process name.</p>
       <div class="row">
         <div><label>Part No</label><input id="newPartNo" placeholder="e.g. VDK1000" style="width:140px;" /></div>
         <div><label>Part Name</label><input id="newPartName" placeholder="e.g. NEW COVER" style="width:220px;" /></div>
-        <div><label>First process name</label><input id="newFirstProc" value="SHEARING" style="width:180px;" /></div>
         <button type="button" id="btnAddPart">Add</button>
       </div>
     </div>
@@ -152,16 +181,14 @@
 
   <div id="detailPanel" class="panel" style="display:none;">
     <h2>Part detail: <span id="detailPartLabel"></span></h2>
-    <p class="muted">Changing Part Name updates part master.</p>
     <div class="row">
-      <div><label>Display name (Part Name)</label><input id="editPartName" style="width:280px;" /></div>
+      <div><label>Part Name</label><input id="editPartName" style="width:280px;" /></div>
       <button type="button" id="btnSavePartName">Save name</button>
     </div>
     <div class="row">
       <div><label>Customer abbrev (header)</label><input id="editCustomerAbbrev" placeholder="e.g. YEMI" style="width:140px;" maxlength="50" /></div>
       <button type="button" id="btnSaveCustomerAbbrev">Save</button>
     </div>
-    <p class="muted">Shown on the entry screen header after Load. Clear the field and Save to remove.</p>
 
     <h3 style="margin-top:16px;">Processes</h3>
     <table id="procTable">
@@ -184,7 +211,14 @@
       <div><label>drawingNo</label><input id="drNo" style="width:120px;" /></div>
       <div><label>drawingName</label><input id="drName" style="width:180px;" /></div>
       <div><label>fileUrl</label><input id="drUrl" style="width:220px;" /></div>
-      <div><label>Drawing image</label><input id="drFile" type="file" accept="image/*" style="width:220px;" /></div>
+      <div>
+        <label>Drawing image</label>
+        <div class="file-pick">
+          <input id="drFile" class="visually-hidden" type="file" accept="image/*" />
+          <button type="button" id="pickDrFile">Choose file</button>
+          <span id="drFileName" class="file-name">No file chosen</span>
+        </div>
+      </div>
       <button type="button" id="btnUploadDrawing">Upload image</button>
       <button type="button" id="btnAddDr">Add</button>
     </div>
@@ -367,18 +401,9 @@
 
     function updatePartsSummary() {
       const el = document.getElementById("partsSummary");
-      const partNo = getSelectedCatalogPartNo();
-      if (!partNo) {
-        el.textContent = "No registered parts.";
-        return;
-      }
-      const p = catalogParts.find(x => x.partNo === partNo);
-      if (!p) {
-        el.textContent = "";
-        return;
-      }
-      const procCount = p.processes ? p.processes.length : 0;
-      el.textContent = `Part No: ${p.partNo} / Part Name: ${p.partName || ""} / Processes: ${procCount}`;
+      if (!el) return;
+      el.textContent = "";
+      el.style.display = "none";
     }
 
     async function refreshDetail() {
@@ -552,6 +577,17 @@
       setTimeout(() => { el.style.display = "none"; }, 2000);
     }
 
+    function bindFilePicker(fileInputId, pickButtonId, fileNameId) {
+      const input = document.getElementById(fileInputId);
+      const pickButton = document.getElementById(pickButtonId);
+      const fileName = document.getElementById(fileNameId);
+      pickButton.onclick = () => input.click();
+      input.onchange = () => {
+        const f = input.files && input.files[0] ? input.files[0].name : "";
+        fileName.textContent = f || "No file chosen";
+      };
+    }
+
     document.getElementById("formatSel").onchange = () => {
       formatId = Number(document.getElementById("formatSel").value);
       selectedPart = null;
@@ -611,11 +647,10 @@
       showErr("catalogMsg", "");
       const partNo = document.getElementById("newPartNo").value.trim();
       const partName = document.getElementById("newPartName").value.trim();
-      const firstProcessName = document.getElementById("newFirstProc").value.trim();
       const res = await fetch("/api/admin/parts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formatId, partNo, partName, firstProcessName })
+        body: JSON.stringify({ formatId, partNo, partName })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -727,6 +762,8 @@
     };
 
     (async () => {
+      bindFilePicker("brandLogoFile", "pickBrandLogoFile", "brandLogoFileName");
+      bindFilePicker("drFile", "pickDrFile", "drFileName");
       await loadFormats();
       await loadHeaderBranding();
       await loadCatalog();

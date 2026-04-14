@@ -14,7 +14,7 @@ function registerAdminRoutes(app, sql, getPool) {
     return rs.recordset[0].n;
   }
 
-  /** Catalog: all parts (from process master) + processes per part */
+  /** Catalog: all active parts + processes per part */
   app.get("/api/admin/catalog", async (req, res) => {
     const formatId = Number(req.query.formatId);
     if (!formatId) return res.status(400).json({ message: "formatId is required" });
@@ -30,6 +30,7 @@ function registerAdminRoutes(app, sql, getPool) {
           SELECT pm.part_no AS partNo, pm.part_name AS partName
           FROM dbo.part_master pm
           WHERE pm.format_id = @formatId AND pm.active_flag = 1
+          ORDER BY pm.part_no
         `);
       const nameByPart = {};
       for (const r of nameRs.recordset) {
@@ -47,6 +48,15 @@ function registerAdminRoutes(app, sql, getPool) {
         `);
 
       const partMap = new Map();
+      for (const r of nameRs.recordset) {
+        const pn = r.partNo;
+        if (!pn || partMap.has(pn)) continue;
+        partMap.set(pn, {
+          partNo: pn,
+          partName: r.partName || pn,
+          processes: []
+        });
+      }
       for (const row of procRs.recordset) {
         const pn = row.partNo;
         if (!partMap.has(pn)) {
@@ -228,12 +238,12 @@ function registerAdminRoutes(app, sql, getPool) {
     }
   });
 
-  /** New part: part master row + one initial process */
+  /** New part: part master row, and optional first process. */
   app.post("/api/admin/parts", async (req, res) => {
     const { formatId, partNo, partName, firstProcessName } = req.body || {};
     const pn = String(partNo || "").trim().toUpperCase();
     const pname = String(partName || "").trim();
-    const proc0 = String(firstProcessName || "SHEARING").trim() || "SHEARING";
+    const proc0 = firstProcessName != null ? String(firstProcessName).trim() : "";
     if (!formatId || !pn || !pname) {
       return res.status(400).json({ message: "formatId, partNo, partName are required" });
     }
@@ -260,8 +270,6 @@ function registerAdminRoutes(app, sql, getPool) {
         return res.status(409).json({ message: "partNo already exists for this format" });
       }
 
-      const ord = await nextProcessDisplayOrder(pool, Number(formatId));
-
       await new sql.Request(transaction)
         .input("formatId", sql.Int, Number(formatId))
         .input("partNo", sql.NVarChar(50), pn)
@@ -275,15 +283,18 @@ function registerAdminRoutes(app, sql, getPool) {
           VALUES (@formatId, @partNo, @partName, 1)
         `);
 
-      await new sql.Request(transaction)
-        .input("formatId", sql.Int, Number(formatId))
-        .input("partNo", sql.NVarChar(50), pn)
-        .input("processName", sql.NVarChar(200), proc0)
-        .input("displayOrder", sql.Int, ord)
-        .query(`
-          INSERT INTO dbo.process_master (format_id, part_no, process_name, display_order)
-          VALUES (@formatId, @partNo, @processName, @displayOrder)
-        `);
+      if (proc0) {
+        const ord = await nextProcessDisplayOrder(pool, Number(formatId));
+        await new sql.Request(transaction)
+          .input("formatId", sql.Int, Number(formatId))
+          .input("partNo", sql.NVarChar(50), pn)
+          .input("processName", sql.NVarChar(200), proc0)
+          .input("displayOrder", sql.Int, ord)
+          .query(`
+            INSERT INTO dbo.process_master (format_id, part_no, process_name, display_order)
+            VALUES (@formatId, @partNo, @processName, @displayOrder)
+          `);
+      }
 
       await transaction.commit();
       res.status(201).json({ ok: true, partNo: pn });

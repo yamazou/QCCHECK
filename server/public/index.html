@@ -86,7 +86,7 @@
       width: auto;
       max-width: none;
       border: 0;
-      border-bottom: 1px solid #999;
+      border-bottom: 0;
       text-align: center;
       padding: 4px 2px 6px;
       font-size: 12px;
@@ -151,9 +151,9 @@
     }
     .meta-row .v.eff-ym button {
       flex-shrink: 0;
-      padding: 4px 10px;
+      margin-left: 20px;
+      padding: 8px 14px;
       cursor: pointer;
-      font-size: 12px;
     }
     label { font-size: 12px; color: #333; display: block; margin-bottom: 4px; }
     input, select { width: 100%; padding: 6px; box-sizing: border-box; }
@@ -163,6 +163,8 @@
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
     td input, td select { font-size: 12px; padding: 4px; }
+    .detail-sheet .num-col { min-width: 58px; }
+    .detail-sheet .pic-col { min-width: 92px; }
     .sheet-table-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; }
     #tableWrap .detail-sheet td.check-col { min-width: 44px; vertical-align: middle; }
     #tableWrap .detail-sheet td.check-col select {
@@ -229,6 +231,7 @@
     .actions { margin-top: 12px; display: flex; gap: 8px; }
     button { padding: 8px 14px; cursor: pointer; }
     .ref-wrap { margin-top: 12px; display: grid; grid-template-columns: 7fr 3fr; gap: 12px; }
+    #tableWrap { margin-top: 10px; }
     .panel { border: 1px solid #ccc; padding: 8px; }
     .panel h3 { margin: 0 0 8px 0; font-size: 14px; }
     .drawing-layout { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -251,10 +254,80 @@
     .remarks-grid td input { width: 100%; border: 0; padding: 4px; box-sizing: border-box; }
     .footer-code { border-top: 1px solid #333; padding: 4px 8px; font-size: 11px; color: #333; }
     #result { margin-top: 10px; white-space: pre-wrap; font-size: 12px; }
-    .admin-nav { margin: 0 0 10px; font-size: 12px; }
+    .admin-nav { margin: 0 0 10px; font-size: 12px; text-align: right; }
     .admin-nav a { color: #06c; }
     .print-root { display: none; }
     .print-page { box-sizing: border-box; }
+    @media screen {
+      :root {
+        --bg: #f4f7fb;
+        --panel: #ffffff;
+        --line: #d7deea;
+        --text: #1b2538;
+        --muted: #5f6c83;
+        --accent: #0b63d8;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .admin-nav,
+      .screen-sheet,
+      .actions,
+      #result {
+        max-width: 1240px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .admin-nav a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .admin-nav a:hover { text-decoration: underline; }
+      .screen-sheet {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 6px 22px rgba(12, 45, 96, 0.08);
+        padding: 12px;
+      }
+      .header-sheet {
+        border: 1px solid #b9c6dc;
+        border-radius: 8px;
+      }
+      .header-title-row h1 {
+        font-size: 26px;
+      }
+      .tabs { margin: 14px 0; }
+      .tab {
+        border: 1px solid #c4d2ea;
+        background: #f6f9ff;
+        color: #1f2c46;
+        border-radius: 8px;
+      }
+      .tab.active {
+        background: #dce9ff;
+        border-color: #90b2ef;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        box-shadow: 0 3px 12px rgba(20, 46, 89, 0.05);
+      }
+      button {
+        border: 1px solid #0e57bb;
+        background: linear-gradient(180deg, #1a79ef, #0b63d8);
+        color: #fff;
+        border-radius: 8px;
+        font-weight: 600;
+      }
+      button:hover {
+        background: linear-gradient(180deg, #0f6de2, #0958c3);
+      }
+    }
     @media print {
       @page {
         size: A4 portrait;
@@ -273,13 +346,14 @@
         box-sizing: border-box;
         width: 100% !important;
         max-width: none !important;
-        padding: 4mm 5mm;
+        padding: 0 5mm 4mm;
         margin: 0 !important;
       }
       .print-page {
         box-sizing: border-box;
         width: 100% !important;
         max-width: none !important;
+        padding-top: 7mm;
         page-break-after: always;
         break-after: page;
       }
@@ -360,7 +434,7 @@
 </head>
 <body>
   <div id="printRoot" class="print-root" aria-hidden="true"></div>
-  <p class="admin-nav"><a href="/admin.html">Master data (parts, processes, drawings, point checks)</a></p>
+  <p class="admin-nav"><a href="/admin.html">Master Data Management</a></p>
   <div class="screen-sheet">
     <div class="header-sheet">
     <div class="header-main">
@@ -709,9 +783,17 @@
 
       wrap.innerHTML = `<div class="sheet-table-scroll"><table class="detail-sheet">
           <colgroup>
-            <col span="15">
+            <col style="width:42px;">
+            <col style="width:92px;">
+            <col style="width:74px;">
+            <col style="width:74px;">
+            <col style="width:58px;">
+            <col style="width:58px;">
+            <col style="width:58px;">
+            <col style="width:96px;">
+            <col span="7">
             <col style="width:118px;">
-            <col style="width:260px;">
+            <col style="width:340px;">
           </colgroup>
           <thead>
             <tr>
@@ -737,10 +819,10 @@
                 </td>
                 <td><input type="time" data-i="${i}" data-k="startTime" value="${r.startTime || ""}"></td>
                 <td><input type="time" data-i="${i}" data-k="finishTime" value="${r.finishTime || ""}"></td>
-                <td><input type="number" min="0" data-i="${i}" data-k="qty" value="${r.qty}"></td>
-                <td><input type="number" min="0" data-i="${i}" data-k="okCount" value="${r.okCount}"></td>
-                <td><input type="number" min="0" data-i="${i}" data-k="ngCount" value="${r.ngCount}"></td>
-                <td><input data-i="${i}" data-k="pic" value="${r.pic || ""}"></td>
+                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="qty" value="${r.qty}"></td>
+                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="okCount" value="${r.okCount}"></td>
+                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="ngCount" value="${r.ngCount}"></td>
+                <td class="pic-col"><input data-i="${i}" data-k="pic" value="${r.pic || ""}"></td>
                 ${["A","B","C","D","E","F","G"].map((code) => `
                   <td class="check-col">
                     <select data-i="${i}" data-k="check_${code}" aria-label="Check ${code}">
@@ -1029,7 +1111,12 @@
       renderTable();
     }
 
-    function toNum(v) { return v === "" ? null : Number(v); }
+    function toNum(v) {
+      const s = String(v ?? "").trim();
+      if (s === "") return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
 
     function normalizeTimeForSave(v) {
       if (v == null) return null;
