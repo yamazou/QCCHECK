@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
+const fs = require("fs");
 const path = require("path");
+const multer = require("multer");
 const XLSX = require("xlsx");
 const { sql, getPool } = require("./db");
 const { registerAdminRoutes } = require("./adminRoutes");
@@ -9,12 +11,81 @@ const app = express();
 app.use(express.json({ limit: "5mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
+const publicDir = path.join(__dirname, "..", "public");
+const uploadRootDir = path.join(publicDir, "uploads");
+const uploadLogoDir = path.join(uploadRootDir, "logos");
+const uploadDrawingDir = path.join(uploadRootDir, "drawings");
+fs.mkdirSync(uploadLogoDir, { recursive: true });
+fs.mkdirSync(uploadDrawingDir, { recursive: true });
+
+function sanitizeBaseName(name) {
+  return String(name || "image")
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60) || "image";
+}
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const type = String(req.query.type || "").trim().toLowerCase();
+    cb(null, type === "logo" ? uploadLogoDir : uploadDrawingDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase() || ".png";
+    const base = sanitizeBaseName(file.originalname);
+    const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    cb(null, `${base}-${stamp}${ext}`);
+  }
+});
+
+const uploadImage = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed"));
+    }
+    cb(null, true);
+  }
+});
+
+app.post("/api/admin/upload-image", (req, res) => {
+  const type = String(req.query.type || "").trim().toLowerCase();
+  if (!["logo", "drawing"].includes(type)) {
+    return res.status(400).json({ message: "type query must be logo or drawing" });
+  }
+  uploadImage.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ message: err.message || "upload failed" });
+    if (!req.file) return res.status(400).json({ message: "file is required" });
+    const subDir = type === "logo" ? "logos" : "drawings";
+    const fileUrl = `/uploads/${subDir}/${req.file.filename}`;
+    res.status(201).json({
+      ok: true,
+      fileUrl,
+      fileName: req.file.filename,
+      originalName: req.file.originalname
+    });
+  });
+});
+
 /** Avoid TDS errors with nullable fixed-size NVarChar; trim and map blank to null. */
 function nullableAscii(value, maxLen) {
   if (value === undefined || value === null) return null;
   const s = String(value).trim();
   if (s === "") return null;
   return s.length > maxLen ? s.slice(0, maxLen) : s;
+}
+
+/** Normalize effective month input to first day (YYYY-MM-01). */
+function normalizeEffDate(value) {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (!m) return s;
+  return `${m[1]}-${m[2]}-01`;
 }
 
 function validateRow(row) {
@@ -203,7 +274,7 @@ app.get("/api/formats/:formatId/processes", async (req, res) => {
     const request = pool.request().input("formatId", sql.Int, Number(formatId));
     let query = `
       SELECT process_master_id AS processMasterId, process_name AS processName, display_order AS displayOrder
-      FROM dbo.format_process_master
+      FROM dbo.process_master
       WHERE format_id = @formatId AND active_flag = 1
     `;
     if (partNo) {
@@ -223,21 +294,61 @@ app.get("/api/formats/:formatId/parts", async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request().input("formatId", sql.Int, Number(formatId)).query(`
-      SELECT DISTINCT fmp.part_no AS partNo,
-        ISNULL((
-          SELECT TOP 1 dr.drawing_name
-          FROM dbo.drawing_reference dr
-          WHERE dr.format_id = fmp.format_id
-            AND dr.part_no = fmp.part_no
-            AND dr.process_code IS NULL
-            AND dr.active_flag = 1
-        ), fmp.part_no) AS partName
-      FROM dbo.format_process_master fmp
-      WHERE fmp.format_id = @formatId AND fmp.active_flag = 1
+      IF OBJECT_ID('dbo.part_master', 'U') IS NULL
+      BEGIN
+        THROW 50001, 'part_master table not found. Run sql/17_part_master.sql first.', 1;
+      END
+      SELECT DISTINCT
+        fmp.part_no AS partNo,
+        ISNULL(pm.part_name, fmp.part_no) AS partName
+      FROM dbo.process_master fmp
+      LEFT JOIN dbo.part_master pm
+        ON pm.format_id = fmp.format_id
+       AND UPPER(LTRIM(RTRIM(pm.part_no))) = UPPER(LTRIM(RTRIM(fmp.part_no)))
+       AND pm.active_flag = 1
+      WHERE fmp.format_id = @formatId
+        AND fmp.active_flag = 1
         AND fmp.part_no IS NOT NULL
-      ORDER BY partNo
+      ORDER BY fmp.part_no
     `);
     res.json(rs.recordset);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.get("/api/formats/:formatId/header-branding", async (req, res) => {
+  const formatId = Number(req.params.formatId);
+  if (!formatId) return res.status(400).json({ message: "formatId is required" });
+  try {
+    const pool = await getPool();
+    const rs = await pool.request()
+      .input("formatId", sql.Int, formatId)
+      .query(`
+        IF OBJECT_ID('dbo.format_header_branding', 'U') IS NULL
+        BEGIN
+          SELECT
+            CAST(NULL AS NVARCHAR(200)) AS companyName,
+            CAST(NULL AS NVARCHAR(200)) AS departmentName,
+            CAST(NULL AS NVARCHAR(500)) AS logoUrl;
+        END
+        ELSE
+        BEGIN
+          SELECT TOP 1
+            company_name AS companyName,
+            department_name AS departmentName,
+            logo_url AS logoUrl
+          FROM dbo.format_header_branding
+          WHERE format_id = @formatId AND active_flag = 1
+          ORDER BY updated_at DESC, format_header_branding_id DESC;
+        END
+      `);
+    const row = rs.recordset[0] || {};
+    res.json({
+      companyName: row.companyName || null,
+      departmentName: row.departmentName || null,
+      logoUrl: row.logoUrl || null
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -259,7 +370,7 @@ app.get("/api/references", async (req, res) => {
         SELECT dr.drawing_ref_id AS drawingRefId, dr.process_code AS processCode, dr.drawing_no AS drawingNo,
                dr.drawing_name AS drawingName, dr.file_url AS fileUrl, dr.note
         FROM dbo.drawing_reference dr
-        LEFT JOIN dbo.format_process_master fpm
+        LEFT JOIN dbo.process_master fpm
           ON fpm.format_id = dr.format_id
           AND fpm.part_no = dr.part_no
           AND dr.process_code IS NOT NULL
@@ -279,7 +390,7 @@ app.get("/api/references", async (req, res) => {
         SELECT pcr.point_check_ref_id AS pointCheckRefId, pcr.process_code AS processCode, pcr.check_code AS checkCode,
                pcr.check_point AS pointCheckText, pcr.criteria, pcr.check_method AS checkMethod, pcr.note
         FROM dbo.point_check_reference pcr
-        LEFT JOIN dbo.format_process_master fpm
+        LEFT JOIN dbo.process_master fpm
           ON fpm.format_id = pcr.format_id
           AND fpm.part_no = pcr.part_no
           AND pcr.process_code IS NOT NULL
@@ -359,6 +470,7 @@ app.post("/api/checksheets", async (req, res) => {
   const body = req.body;
   const verr = validateChecksheetBody(body);
   if (verr) return res.status(400).json({ message: verr });
+  const effDate = normalizeEffDate(body.effDate);
 
   let transaction;
   try {
@@ -370,7 +482,7 @@ app.post("/api/checksheets", async (req, res) => {
       .input("formatId", sql.Int, body.formatId)
       .input("partNo", sql.NVarChar(100), body.partNo)
       .input("partName", sql.NVarChar(200), body.partName)
-      .input("effDate", sql.Date, body.effDate || null)
+      .input("effDate", sql.Date, effDate)
       .input("revNo", sql.NVarChar(50), body.revNo || null)
       .input("department", sql.NVarChar(200), body.department || null)
       .input("sheetDate", sql.Date, body.sheetDate || null)
@@ -410,6 +522,7 @@ app.put("/api/checksheets/:headerId", async (req, res) => {
   const body = req.body;
   const verr = validateChecksheetBody(body);
   if (verr) return res.status(400).json({ message: verr });
+  const effDate = normalizeEffDate(body.effDate);
   if (!Number.isFinite(headerId) || headerId < 1) {
     return res.status(400).json({ message: "invalid headerId" });
   }
@@ -422,7 +535,7 @@ app.put("/api/checksheets/:headerId", async (req, res) => {
       .input("headerId", sql.BigInt, headerId)
       .input("formatId", sql.Int, body.formatId)
       .input("partNo", sql.NVarChar(100), body.partNo)
-      .input("effDate", sql.Date, body.effDate || null)
+      .input("effDate", sql.Date, effDate)
       .query(`
         SELECT header_id FROM dbo.checksheet_header
         WHERE header_id = @headerId AND format_id = @formatId AND part_no = @partNo AND eff_date = @effDate
@@ -455,7 +568,7 @@ app.put("/api/checksheets/:headerId", async (req, res) => {
     await new sql.Request(transaction)
       .input("headerId", sql.BigInt, headerId)
       .input("partName", sql.NVarChar(200), body.partName)
-      .input("effDate", sql.Date, body.effDate || null)
+      .input("effDate", sql.Date, effDate)
       .input("revNo", sql.NVarChar(50), body.revNo || null)
       .input("department", sql.NVarChar(200), body.department || null)
       .input("sheetDate", sql.Date, body.sheetDate || null)
@@ -503,7 +616,7 @@ app.put("/api/checksheets/:headerId", async (req, res) => {
 app.get("/api/checksheets/for-month", async (req, res) => {
   const formatId = Number(req.query.formatId);
   const partNo = String(req.query.partNo || "");
-  const effDate = req.query.effDate;
+  const effDate = normalizeEffDate(req.query.effDate);
   if (!formatId || !partNo || !effDate) {
     return res.status(400).json({ message: "formatId, partNo, and effDate are required" });
   }

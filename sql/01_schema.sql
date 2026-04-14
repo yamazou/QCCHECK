@@ -14,9 +14,10 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID('dbo.format_process_master', 'U') IS NULL
+IF OBJECT_ID('dbo.process_master', 'U') IS NULL
+   AND OBJECT_ID('dbo.format_process_master', 'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.format_process_master (
+    CREATE TABLE dbo.process_master (
         process_master_id INT IDENTITY(1,1) PRIMARY KEY,
         format_id INT NOT NULL,
         part_no NVARCHAR(50) NULL,
@@ -25,26 +26,8 @@ BEGIN
         active_flag BIT NOT NULL DEFAULT 1,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        CONSTRAINT FK_fpm_format FOREIGN KEY (format_id) REFERENCES dbo.format_master(format_id),
-        CONSTRAINT UQ_fpm_format_order UNIQUE(format_id, display_order)
-    );
-END
-GO
-
-IF OBJECT_ID('dbo.format_check_item_master', 'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.format_check_item_master (
-        check_item_id INT IDENTITY(1,1) PRIMARY KEY,
-        format_id INT NOT NULL,
-        check_code NCHAR(1) NOT NULL,
-        check_name NVARCHAR(200) NULL,
-        display_order INT NOT NULL,
-        active_flag BIT NOT NULL DEFAULT 1,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        CONSTRAINT FK_fcim_format FOREIGN KEY (format_id) REFERENCES dbo.format_master(format_id),
-        CONSTRAINT CK_fcim_code CHECK (check_code IN ('A','B','C','D','E','F','G')),
-        CONSTRAINT UQ_fcim_format_code UNIQUE(format_id, check_code)
+        CONSTRAINT FK_pm_format FOREIGN KEY (format_id) REFERENCES dbo.format_master(format_id),
+        CONSTRAINT UQ_pm_format_order UNIQUE(format_id, display_order)
     );
 END
 GO
@@ -89,7 +72,7 @@ BEGIN
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_cp_header FOREIGN KEY (header_id) REFERENCES dbo.checksheet_header(header_id),
-        CONSTRAINT FK_cp_master FOREIGN KEY (process_master_id) REFERENCES dbo.format_process_master(process_master_id),
+        CONSTRAINT FK_cp_master FOREIGN KEY (process_master_id) REFERENCES dbo.process_master(process_master_id),
         CONSTRAINT UQ_cp_header_order UNIQUE(header_id, display_order)
     );
 END

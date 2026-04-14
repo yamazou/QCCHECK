@@ -86,7 +86,7 @@ Response:
 - Used on the entry screen for drawing preview and point check table.
 - `partNo` is matched case-insensitively (normalized to upper case).
 - Also returns `customerAbbrev` from `part_customer` (Customer name abbreviation in the sheet header after **Load**). `null` if not set.
-- Order: rows with `processCode` null (part-wide) first; then by `format_process_master.display_order` for that part; then `drawing_no` / `check_code`. Rows whose `processCode` does not match a process in the master sort last.
+- Order: rows with `processCode` null (part-wide) first; then by `process_master.display_order` for that part; then `drawing_no` / `check_code`. Rows whose `processCode` does not match a process in the master sort last.
 
 Response:
 ```json
@@ -151,13 +151,13 @@ Request:
 ### 7.3 New part
 - `POST /admin/parts`
 - Body: `{ "formatId", "partNo", "partName", "firstProcessName?" }`
-- Inserts first row in `format_process_master` and assembly row in `drawing_reference` (`{partNo}-ASM`, `process_code` NULL).
+- Inserts first row in `process_master` and assembly row in `drawing_reference` (`{partNo}-ASM`, `process_code` NULL).
 - 409 if `partNo` already exists for the format.
 
 ### 7.3b Delete part (full purge)
 - `DELETE /admin/parts/:partNo?formatId=1`
-- **404** if the part has no rows in `format_process_master` for that format.
-- In one transaction, deletes (for that `format_id` + `part_no`): all `checksheet_row_check` / `checksheet_row` / `checksheet_process` / `checksheet_header` linked to those headers; then `format_process_master`, `drawing_reference`, `point_check_reference`, and `part_customer` (if the table exists).
+- **404** if the part has no rows in `process_master` for that format.
+- In one transaction, deletes (for that `format_id` + `part_no`): all `checksheet_row_check` / `checksheet_row` / `checksheet_process` / `checksheet_header` linked to those headers; then `process_master`, `drawing_reference`, `point_check_reference`, and `part_customer` (if the table exists).
 
 ### 7.4 Add / update / delete process
 - `POST /admin/processes` — Body: `{ "formatId", "partNo", "processName" }` (`display_order` = max for format + 1).

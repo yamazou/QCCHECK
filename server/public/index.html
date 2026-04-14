@@ -10,7 +10,7 @@
     .header-sheet { border: 1px solid #333; margin-bottom: 12px; }
     .header-main {
       display: grid;
-      grid-template-columns: 188px 1fr 240px;
+      grid-template-columns: 230px 1fr 240px;
       align-items: stretch;
     }
     .header-col-brand {
@@ -25,7 +25,7 @@
       box-sizing: border-box;
     }
     .header-col-brand .brand-logo { display: flex; align-items: center; justify-content: center; width: 100%; }
-    .header-col-brand .brand-logo img { max-width: 100%; max-height: 52px; object-fit: contain; }
+    .header-col-brand .brand-logo img { max-width: 100%; max-height: 76px; object-fit: contain; }
     .header-col-brand .brand-name { font-weight: 700; font-size: 12px; line-height: 1.25; }
     .header-col-brand .dept { font-style: italic; font-weight: 500; font-size: 11px; line-height: 1.2; }
     .header-col-meta {
@@ -45,7 +45,7 @@
     }
     .header-title-row h1 {
       margin: 0;
-      font-size: 17px;
+      font-size: 22px;
       font-weight: 700;
       letter-spacing: 0.35px;
       line-height: 1.2;
@@ -311,8 +311,10 @@
         width: 100% !important;
       }
       .print-page .header-main {
-        grid-template-columns: minmax(44mm, 0.88fr) minmax(0, 2.2fr) minmax(48mm, 0.95fr) !important;
+        grid-template-columns: minmax(52mm, 1fr) minmax(0, 2.1fr) minmax(48mm, 0.95fr) !important;
       }
+      .print-page .header-title-row h1 { font-size: 19px !important; }
+      .print-page .header-col-brand .brand-logo img { max-height: 70px !important; }
       .print-page .sign-yemi { font-size: 28px !important; padding: 2px 4px !important; }
       .print-page .sign-pad-prep, .print-page .sign-pad-app { min-height: 20mm !important; }
       .print-page .ref-wrap {
@@ -363,9 +365,9 @@
     <div class="header-sheet">
     <div class="header-main">
       <div class="header-col-brand">
-        <div class="brand-logo"><img src="/drawings/UACJ_logo.png" alt="UACJ"></div>
-        <div class="brand-name">PT YAN JIN INDONESIA</div>
-        <div class="dept">Production Department</div>
+        <div class="brand-logo"><img id="headerBrandLogo" src="/drawings/UACJ_logo.png" alt="Company logo"></div>
+        <div class="brand-name" id="headerBrandCompany">PT YAN JIN INDONESIA</div>
+        <div class="dept" id="headerBrandDept">Production Department</div>
       </div>
       <div class="header-col-meta">
         <div class="header-title-row"><h1>CHECK SHEET PRODUCTION</h1></div>
@@ -505,8 +507,30 @@
       selectedProcessIndex: 0,
       rowsByProcess: {},
       partNamesByNo: {},
+      headerBranding: null,
       editingHeaderId: null
     };
+
+    const DEFAULT_HEADER_BRANDING = {
+      companyName: "PT YAN JIN INDONESIA",
+      departmentName: "Production Department",
+      logoUrl: "/drawings/UACJ_logo.png"
+    };
+
+    function applyHeaderBranding(branding) {
+      const b = branding || DEFAULT_HEADER_BRANDING;
+      const company = b.companyName || DEFAULT_HEADER_BRANDING.companyName;
+      const department = b.departmentName || DEFAULT_HEADER_BRANDING.departmentName;
+      const logoUrl = b.logoUrl || DEFAULT_HEADER_BRANDING.logoUrl;
+      const companyEl = document.getElementById("headerBrandCompany");
+      const deptEl = document.getElementById("headerBrandDept");
+      const logoEl = document.getElementById("headerBrandLogo");
+      if (companyEl) companyEl.textContent = company;
+      if (deptEl) deptEl.textContent = department;
+      if (logoEl) logoEl.src = logoUrl;
+      const deptInput = document.getElementById("department");
+      if (deptInput) deptInput.value = department;
+    }
 
     function rowHasSheetData(r) {
       const hasChecks = ["A", "B", "C", "D", "E", "F", "G"].some((code) => r.checks[code]);
@@ -823,12 +847,21 @@
       state.rowsByProcess = {};
       fillPartSelects([]);
       if (!formatId) {
+        applyHeaderBranding(DEFAULT_HEADER_BRANDING);
         renderTabs();
         updateHeaderProcess();
         renderReferences();
         renderTable();
         return;
       }
+      try {
+        const bRes = await fetch(`/api/formats/${formatId}/header-branding`);
+        const bData = await bRes.json().catch(() => ({}));
+        state.headerBranding = bRes.ok ? bData : null;
+      } catch (_e) {
+        state.headerBranding = null;
+      }
+      applyHeaderBranding(state.headerBranding);
       const res = await fetch(`/api/formats/${formatId}/parts`);
       const parts = await res.json();
       if (!res.ok) {

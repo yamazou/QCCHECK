@@ -5,55 +5,142 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QC Check — Master data</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 16px; max-width: 1200px; }
-    h1 { font-size: 20px; margin: 0 0 8px; }
-    .sub { color: #555; font-size: 13px; margin-bottom: 16px; }
-    a { color: #06c; }
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #d7deea;
+      --text: #1b2538;
+      --muted: #5f6c83;
+      --accent: #0b63d8;
+      --accent-strong: #084cad;
+    }
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    .app-shell { max-width: 1240px; margin: 20px auto; padding: 0 16px 24px; }
+    .hero {
+      background: linear-gradient(120deg, #ffffff, #eef4ff);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 6px 22px rgba(12, 45, 96, 0.08);
+      margin-bottom: 14px;
+    }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .brand-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-logo { height: 42px; width: auto; }
+    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: 0.2px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 0; }
+    a { color: var(--accent); }
+    .toolbar { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
-    label { display: block; font-size: 12px; color: #333; margin-bottom: 4px; }
-    input, select, textarea { padding: 6px 8px; font-size: 14px; box-sizing: border-box; }
-    button { padding: 8px 14px; cursor: pointer; font-size: 13px; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
-    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-    th { background: #f0f0f0; }
-    .muted { color: #666; font-size: 12px; }
-    .panel { border: 1px solid #ddd; padding: 12px; margin-top: 16px; border-radius: 4px; }
+    label { display: block; font-size: 12px; color: #334160; margin-bottom: 4px; }
+    input, select, textarea {
+      padding: 7px 9px;
+      font-size: 14px;
+      box-sizing: border-box;
+      border: 1px solid #c9d4e8;
+      border-radius: 7px;
+      background: #fff;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(11, 99, 216, 0.12);
+    }
+    button {
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      border: 1px solid #0e57bb;
+      background: linear-gradient(180deg, #1a79ef, #0b63d8);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    button:hover { background: linear-gradient(180deg, #0f6de2, #0958c3); }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; background: #fff; }
+    th, td { border: 1px solid #d5deec; padding: 6px 8px; text-align: left; }
+    th { background: #ecf2fd; color: #2d3d5a; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 12px;
+      margin-top: 16px;
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(20, 46, 89, 0.05);
+    }
     .panel h2 { margin: 0 0 10px; font-size: 16px; }
     .err { color: #b00; font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
     .ok { color: #060; font-size: 13px; margin-top: 8px; }
-    .btn-del { color: #a00; border-color: #c99; }
-    code { font-size: 12px; background: #f5f5f5; padding: 1px 4px; }
+    .btn-del { background: linear-gradient(180deg, #d95c5c, #bf3f3f); border-color: #9d2f2f; color: #fff; }
+    code { font-size: 12px; background: #f2f5fb; padding: 1px 4px; border-radius: 3px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+    .page-footer {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f7faff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } .brand-logo { height: 36px; } }
   </style>
 </head>
 <body>
-  <h1>Master data (parts, processes, drawings, point checks)</h1>
-  <p class="sub">
-    Data is stored in <code>format_process_master</code>, <code>drawing_reference</code>, and <code>point_check_reference</code>.
-    Open the entry screen from <a href="/">QC Check Entry</a>.
-  </p>
-
-  <div class="row">
-    <div>
-      <label for="formatSel">Format</label>
-      <select id="formatSel"></select>
+  <div class="app-shell">
+    <div class="hero">
+      <div class="brand-row">
+        <div class="brand-left">
+          <img src="/assets/q-finder-logo.png" alt="Q-Finder" class="brand-logo" />
+          <div>
+            <h1>Master Data Management</h1>
+          </div>
+        </div>
+        <p class="sub">Open from <a href="/">QC Check Entry</a></p>
+      </div>
     </div>
-    <button type="button" id="reloadCatalog">Reload catalog</button>
+    <div class="toolbar">
+      <div class="row" style="margin-bottom:0;">
+        <div>
+          <label for="formatSel">Format</label>
+          <select id="formatSel"></select>
+        </div>
+        <button type="button" id="reloadCatalog">Reload catalog</button>
+      </div>
+      <div id="catalogMsg" class="err" style="display:none;"></div>
+    </div>
+
+  <div class="panel" style="margin-top:0;">
+    <h2>Check Sheet header master</h2>
+    <div class="row">
+      <div><label>Company name</label><input id="brandCompany" placeholder="e.g. PT YAN JIN INDONESIA" style="width:320px;" maxlength="200" /></div>
+      <div><label>Department name</label><input id="brandDept" placeholder="e.g. Production Department" style="width:260px;" maxlength="200" /></div>
+      <div><label>Logo URL</label><input id="brandLogo" placeholder="e.g. /drawings/UACJ_logo.png" style="width:320px;" maxlength="500" /></div>
+      <div><label>Logo file</label><input id="brandLogoFile" type="file" accept="image/*" style="width:260px;" /></div>
+      <button type="button" id="btnUploadBrandLogo">Upload logo</button>
+      <button type="button" id="btnSaveBranding">Save header master</button>
+    </div>
+    <div id="brandingMsg" class="err" style="display:none;"></div>
+    <div id="brandingOk" class="ok" style="display:none;"></div>
   </div>
-  <div id="catalogMsg" class="err" style="display:none;"></div>
 
   <div class="grid2">
     <div class="panel">
       <h2>Registered parts</h2>
-      <table id="partsTable">
-        <thead><tr><th>Part No</th><th>Part Name</th><th>Processes</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="row">
+        <div style="min-width:360px;">
+          <label for="partsSelect">Part</label>
+          <select id="partsSelect" style="width:100%;"></select>
+        </div>
+        <button type="button" id="btnOpenPart">Open</button>
+        <button type="button" id="btnDeletePart" class="btn-del">Delete</button>
+      </div>
+      <p id="partsSummary" class="muted"></p>
     </div>
     <div class="panel">
       <h2>Add new part</h2>
-      <p class="muted">Part name is stored on the assembly drawing row (blank process). You can set the first process name.</p>
+      <p class="muted">Part name is stored in part master. You can set the first process name.</p>
       <div class="row">
         <div><label>Part No</label><input id="newPartNo" placeholder="e.g. VDK1000" style="width:140px;" /></div>
         <div><label>Part Name</label><input id="newPartName" placeholder="e.g. NEW COVER" style="width:220px;" /></div>
@@ -65,7 +152,7 @@
 
   <div id="detailPanel" class="panel" style="display:none;">
     <h2>Part detail: <span id="detailPartLabel"></span></h2>
-    <p class="muted">Changing display name (Part Name) updates the assembly drawing name only.</p>
+    <p class="muted">Changing Part Name updates part master.</p>
     <div class="row">
       <div><label>Display name (Part Name)</label><input id="editPartName" style="width:280px;" /></div>
       <button type="button" id="btnSavePartName">Save name</button>
@@ -78,7 +165,7 @@
 
     <h3 style="margin-top:16px;">Processes</h3>
     <table id="procTable">
-      <thead><tr><th>ID</th><th>Process name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+      <thead><tr><th>Process name</th><th>Order</th><th>Active</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row" style="margin-top:8px;">
@@ -86,27 +173,29 @@
       <button type="button" id="btnAddProc">Add process</button>
     </div>
 
-    <h3 style="margin-top:20px;">Drawings (drawing_reference)</h3>
+    <h3 style="margin-top:20px;">Drawings</h3>
     <p class="muted">Blank <code>processCode</code> = part-wide. URL example: <code>/drawings/xxx.png</code></p>
     <table id="drawTable">
-      <thead><tr><th>ID</th><th>Process</th><th>Drawing No</th><th>Name</th><th>fileUrl</th><th>Active</th><th></th></tr></thead>
+      <thead><tr><th>Process</th><th>Drawing No</th><th>Name</th><th>fileUrl</th><th>Active</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row" style="margin-top:8px;">
-      <div><label>Process (blank = common)</label><input id="drProc" placeholder="SHEARING" style="width:140px;" /></div>
+      <div><label>Process (blank = common)</label><select id="drProc" style="width:140px;"><option value="" selected>(common)</option></select></div>
       <div><label>drawingNo</label><input id="drNo" style="width:120px;" /></div>
       <div><label>drawingName</label><input id="drName" style="width:180px;" /></div>
       <div><label>fileUrl</label><input id="drUrl" style="width:220px;" /></div>
+      <div><label>Drawing image</label><input id="drFile" type="file" accept="image/*" style="width:220px;" /></div>
+      <button type="button" id="btnUploadDrawing">Upload image</button>
       <button type="button" id="btnAddDr">Add</button>
     </div>
 
-    <h3 style="margin-top:20px;">Point checks (point_check_reference)</h3>
+    <h3 style="margin-top:20px;">Point checks</h3>
     <table id="pcTable">
-      <thead><tr><th>ID</th><th>Process</th><th>Code</th><th>Text</th><th>Criteria</th><th>Method</th><th>Active</th><th></th></tr></thead>
+      <thead><tr><th>Process</th><th>Code</th><th>Text</th><th>Criteria</th><th>Method</th><th>Active</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row" style="margin-top:8px;">
-      <div><label>Process (blank = common)</label><input id="pcProc" style="width:140px;" /></div>
+      <div><label>Process (blank = common)</label><select id="pcProc" style="width:140px;"><option value="" selected>(common)</option></select></div>
       <div><label>Code A–G</label><select id="pcCode" style="width:60px;"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
       <div><label>Text</label><input id="pcText" style="width:200px;" /></div>
       <div><label>Criteria</label><input id="pcCrit" style="width:140px;" /></div>
@@ -117,6 +206,10 @@
 
   <div id="detailMsg" class="err" style="display:none;"></div>
   <div id="detailOk" class="ok" style="display:none;"></div>
+  <div class="page-footer">
+    Q-Finder v1.0 powered by PT.BAHTERA HISISTEM INDONESIA
+  </div>
+  </div>
 
   <script>
     let formats = [];
@@ -151,25 +244,87 @@
         return;
       }
       catalogParts = data.parts || [];
-      const tb = document.querySelector("#partsTable tbody");
-      tb.innerHTML = catalogParts.map(p => `
-        <tr>
-          <td>${escapeHtml(p.partNo)}</td>
-          <td>${escapeHtml(p.partName)}</td>
-          <td>${p.processes ? p.processes.length : 0}</td>
-          <td class="row-actions"><button type="button" class="openPart" data-part="${escapeHtml(p.partNo)}">Open</button> <button type="button" class="delPart btn-del" data-part="${escapeHtml(p.partNo)}">Delete</button></td>
-        </tr>
+      const partsSel = document.getElementById("partsSelect");
+      partsSel.innerHTML = catalogParts.map(p => `
+        <option value="${escapeHtml(p.partNo)}">${escapeHtml(p.partNo)} - ${escapeHtml(p.partName)} (${p.processes ? p.processes.length : 0})</option>
       `).join("");
-      tb.querySelectorAll(".openPart").forEach(btn => {
-        btn.onclick = () => openPart(btn.dataset.part);
-      });
-      tb.querySelectorAll(".delPart").forEach(btn => {
-        btn.onclick = () => deletePartFromCatalog(btn.dataset.part);
-      });
+
+      if (!catalogParts.length) {
+        selectedPart = null;
+        updatePartsSummary();
+        return;
+      }
+
+      const hasCurrent = catalogParts.some(p => p.partNo === selectedPart);
+      selectedPart = hasCurrent ? selectedPart : catalogParts[0].partNo;
+      partsSel.value = selectedPart;
+      updatePartsSummary();
+    }
+
+    async function loadHeaderBranding() {
+      showErr("brandingMsg", "");
+      showErr("brandingOk", "");
+      if (!formatId) return;
+      const res = await fetch(`/api/admin/header-branding?formatId=${encodeURIComponent(formatId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr("brandingMsg", data.message || res.status);
+        return;
+      }
+      document.getElementById("brandCompany").value = data.companyName || "";
+      document.getElementById("brandDept").value = data.departmentName || "";
+      document.getElementById("brandLogo").value = data.logoUrl || "";
     }
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
+    function getCurrentPartProcesses() {
+      const p = catalogParts.find(x => x.partNo === selectedPart);
+      return p && Array.isArray(p.processes) ? p.processes : [];
+    }
+
+    function buildProcessOptionsHtml(currentValue) {
+      const value = currentValue == null ? "" : String(currentValue);
+      const procs = getCurrentPartProcesses();
+      const seen = new Set();
+      const options = [];
+      options.push(`<option value="" ${value ? "" : "selected"}>(common)</option>`);
+      for (const pr of procs) {
+        const processName = String(pr.processName || "").trim();
+        if (!processName || seen.has(processName)) continue;
+        seen.add(processName);
+        const label = pr.activeFlag ? processName : `${processName} (inactive)`;
+        options.push(`<option value="${escapeHtml(processName)}" ${processName === value ? "selected" : ""}>${escapeHtml(label)}</option>`);
+      }
+      if (value && !seen.has(value)) {
+        options.push(`<option value="${escapeHtml(value)}" selected>${escapeHtml(value)} (unregistered)</option>`);
+      }
+      return options.join("");
+    }
+
+    function renderProcessSelect(className, currentValue, widthPx) {
+      return `<select class="${className}" style="width:${widthPx}px;">${buildProcessOptionsHtml(currentValue)}</select>`;
+    }
+
+    async function uploadImageFile(type, file, errElId) {
+      if (!file) {
+        showErr(errElId, "Select an image file first.");
+        return null;
+      }
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/admin/upload-image?type=${encodeURIComponent(type)}`, {
+        method: "POST",
+        body: fd
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr(errElId, data.message || res.status);
+        return null;
+      }
+      return data.fileUrl || null;
     }
 
     async function deletePartFromCatalog(partNo) {
@@ -194,6 +349,8 @@
 
     async function openPart(partNo) {
       selectedPart = partNo;
+      const partsSel = document.getElementById("partsSelect");
+      if (partsSel) partsSel.value = partNo;
       document.getElementById("detailPanel").style.display = "block";
       document.getElementById("detailPartLabel").textContent = partNo;
       const p = catalogParts.find(x => x.partNo === partNo);
@@ -202,6 +359,26 @@
       showErr("detailOk", "");
       document.getElementById("detailOk").style.display = "none";
       await refreshDetail();
+    }
+
+    function getSelectedCatalogPartNo() {
+      return document.getElementById("partsSelect").value || null;
+    }
+
+    function updatePartsSummary() {
+      const el = document.getElementById("partsSummary");
+      const partNo = getSelectedCatalogPartNo();
+      if (!partNo) {
+        el.textContent = "No registered parts.";
+        return;
+      }
+      const p = catalogParts.find(x => x.partNo === partNo);
+      if (!p) {
+        el.textContent = "";
+        return;
+      }
+      const procCount = p.processes ? p.processes.length : 0;
+      el.textContent = `Part No: ${p.partNo} / Part Name: ${p.partName || ""} / Processes: ${procCount}`;
     }
 
     async function refreshDetail() {
@@ -218,9 +395,10 @@
 
       const p = catalogParts.find(x => x.partNo === selectedPart);
       const procs = p ? p.processes : [];
+      document.getElementById("drProc").innerHTML = buildProcessOptionsHtml("");
+      document.getElementById("pcProc").innerHTML = buildProcessOptionsHtml("");
       document.querySelector("#procTable tbody").innerHTML = procs.map(pr => `
         <tr data-pid="${pr.processMasterId}">
-          <td>${pr.processMasterId}</td>
           <td><input value="${escapeHtml(pr.processName)}" class="pname" style="width:100%;min-width:160px;" /></td>
           <td>${pr.displayOrder}</td>
           <td><input type="checkbox" class="pact" ${pr.activeFlag ? "checked" : ""} /></td>
@@ -237,8 +415,7 @@
 
       document.querySelector("#drawTable tbody").innerHTML = (data.drawings || []).map(d => `
         <tr data-did="${d.drawingRefId}">
-          <td>${d.drawingRefId}</td>
-          <td><input value="${d.processCode == null ? "" : escapeHtml(d.processCode)}" class="dproc" style="width:120px;" /></td>
+          <td>${renderProcessSelect("dproc", d.processCode, 140)}</td>
           <td><input value="${escapeHtml(d.drawingNo)}" class="dno" style="width:100px;" /></td>
           <td><input value="${escapeHtml(d.drawingName || "")}" class="dname" style="width:140px;" /></td>
           <td><input value="${escapeHtml(d.fileUrl || "")}" class="durl" style="width:200px;" /></td>
@@ -258,8 +435,7 @@
 
       document.querySelector("#pcTable tbody").innerHTML = (data.pointChecks || []).map(c => `
         <tr data-pcid="${c.pointCheckRefId}">
-          <td>${c.pointCheckRefId}</td>
-          <td><input value="${c.processCode == null ? "" : escapeHtml(c.processCode)}" class="pcproc" style="width:120px;" /></td>
+          <td>${renderProcessSelect("pcproc", c.processCode, 140)}</td>
           <td><input value="${escapeHtml(c.checkCode)}" class="pccode" style="width:36px;" maxlength="1" /></td>
           <td><input value="${escapeHtml(c.pointCheckText || "")}" class="pctext" style="width:180px;" /></td>
           <td><input value="${escapeHtml(c.criteria || "")}" class="pccrit" style="width:120px;" /></td>
@@ -380,10 +556,56 @@
       formatId = Number(document.getElementById("formatSel").value);
       selectedPart = null;
       document.getElementById("detailPanel").style.display = "none";
+      loadHeaderBranding();
       loadCatalog();
     };
 
     document.getElementById("reloadCatalog").onclick = loadCatalog;
+    document.getElementById("partsSelect").onchange = () => {
+      updatePartsSummary();
+    };
+    document.getElementById("btnOpenPart").onclick = async () => {
+      const partNo = getSelectedCatalogPartNo();
+      if (!partNo) return;
+      await openPart(partNo);
+    };
+    document.getElementById("btnDeletePart").onclick = async () => {
+      const partNo = getSelectedCatalogPartNo();
+      if (!partNo) return;
+      await deletePartFromCatalog(partNo);
+    };
+    document.getElementById("btnSaveBranding").onclick = async () => {
+      showErr("brandingMsg", "");
+      showErr("brandingOk", "");
+      const companyName = document.getElementById("brandCompany").value.trim();
+      const departmentName = document.getElementById("brandDept").value.trim();
+      const logoUrl = document.getElementById("brandLogo").value.trim();
+      const res = await fetch(`/api/admin/header-branding?formatId=${encodeURIComponent(formatId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName, departmentName, logoUrl })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showErr("brandingMsg", data.message || res.status);
+        return;
+      }
+      const ok = document.getElementById("brandingOk");
+      ok.textContent = "Saved";
+      ok.style.display = "block";
+      setTimeout(() => { ok.style.display = "none"; }, 1800);
+    };
+    document.getElementById("btnUploadBrandLogo").onclick = async () => {
+      showErr("brandingMsg", "");
+      const file = document.getElementById("brandLogoFile").files[0];
+      const fileUrl = await uploadImageFile("logo", file, "brandingMsg");
+      if (!fileUrl) return;
+      document.getElementById("brandLogo").value = fileUrl;
+      const ok = document.getElementById("brandingOk");
+      ok.textContent = `Uploaded: ${fileUrl}`;
+      ok.style.display = "block";
+      setTimeout(() => { ok.style.display = "none"; }, 2400);
+    };
 
     document.getElementById("btnAddPart").onclick = async () => {
       showErr("catalogMsg", "");
@@ -407,8 +629,13 @@
 
     document.getElementById("btnSavePartName").onclick = async () => {
       showErr("detailMsg", "");
+      const targetPartNo = (document.getElementById("detailPartLabel").textContent || "").trim() || selectedPart;
+      if (!targetPartNo) {
+        showErr("detailMsg", "No part is open.");
+        return;
+      }
       const partName = document.getElementById("editPartName").value.trim();
-      const res = await fetch(`/api/admin/parts/${encodeURIComponent(selectedPart)}/name?formatId=${encodeURIComponent(formatId)}`, {
+      const res = await fetch(`/api/admin/parts/${encodeURIComponent(targetPartNo)}/name?formatId=${encodeURIComponent(formatId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partName })
@@ -417,7 +644,7 @@
       if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
       flashOk();
       await loadCatalog();
-      await openPart(selectedPart);
+      await openPart(targetPartNo);
     };
 
     document.getElementById("btnSaveCustomerAbbrev").onclick = async () => {
@@ -469,6 +696,14 @@
       flashOk();
       await refreshDetail();
     };
+    document.getElementById("btnUploadDrawing").onclick = async () => {
+      showErr("detailMsg", "");
+      const file = document.getElementById("drFile").files[0];
+      const fileUrl = await uploadImageFile("drawing", file, "detailMsg");
+      if (!fileUrl) return;
+      document.getElementById("drUrl").value = fileUrl;
+      flashOk("Image uploaded");
+    };
 
     document.getElementById("btnAddPc").onclick = async () => {
       const processCode = document.getElementById("pcProc").value.trim() || null;
@@ -493,6 +728,7 @@
 
     (async () => {
       await loadFormats();
+      await loadHeaderBranding();
       await loadCatalog();
     })();
   </script>

@@ -8,7 +8,7 @@ function registerAdminRoutes(app, sql, getPool) {
       .input("formatId", sql.Int, formatId)
       .query(`
         SELECT ISNULL(MAX(display_order), 0) + 1 AS n
-        FROM dbo.format_process_master
+        FROM dbo.process_master
         WHERE format_id = @formatId
       `);
     return rs.recordset[0].n;
@@ -23,9 +23,13 @@ function registerAdminRoutes(app, sql, getPool) {
       const nameRs = await pool.request()
         .input("formatId", sql.Int, formatId)
         .query(`
-          SELECT dr.part_no AS partNo, dr.drawing_name AS partName
-          FROM dbo.drawing_reference dr
-          WHERE dr.format_id = @formatId AND dr.process_code IS NULL AND dr.active_flag = 1
+          IF OBJECT_ID('dbo.part_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'part_master table not found. Run sql/17_part_master.sql first.', 1;
+          END
+          SELECT pm.part_no AS partNo, pm.part_name AS partName
+          FROM dbo.part_master pm
+          WHERE pm.format_id = @formatId AND pm.active_flag = 1
         `);
       const nameByPart = {};
       for (const r of nameRs.recordset) {
@@ -37,7 +41,7 @@ function registerAdminRoutes(app, sql, getPool) {
         .query(`
           SELECT process_master_id AS processMasterId, part_no AS partNo, process_name AS processName,
                  display_order AS displayOrder, active_flag AS activeFlag
-          FROM dbo.format_process_master
+          FROM dbo.process_master
           WHERE format_id = @formatId AND part_no IS NOT NULL
           ORDER BY part_no, display_order
         `);
@@ -66,6 +70,95 @@ function registerAdminRoutes(app, sql, getPool) {
     }
   });
 
+  /** Header branding (company / department / logo) per format */
+  app.get("/api/admin/header-branding", async (req, res) => {
+    const formatId = Number(req.query.formatId);
+    if (!formatId) return res.status(400).json({ message: "formatId is required" });
+    try {
+      const pool = await getPool();
+      const rs = await pool.request()
+        .input("formatId", sql.Int, formatId)
+        .query(`
+          IF OBJECT_ID('dbo.format_header_branding', 'U') IS NULL
+          BEGIN
+            SELECT
+              CAST(NULL AS NVARCHAR(200)) AS companyName,
+              CAST(NULL AS NVARCHAR(200)) AS departmentName,
+              CAST(NULL AS NVARCHAR(500)) AS logoUrl;
+          END
+          ELSE
+          BEGIN
+            SELECT TOP 1
+              company_name AS companyName,
+              department_name AS departmentName,
+              logo_url AS logoUrl
+            FROM dbo.format_header_branding
+            WHERE format_id = @formatId AND active_flag = 1
+            ORDER BY updated_at DESC, format_header_branding_id DESC;
+          END
+        `);
+      const row = rs.recordset[0] || {};
+      res.json({
+        companyName: row.companyName || null,
+        departmentName: row.departmentName || null,
+        logoUrl: row.logoUrl || null
+      });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/header-branding", async (req, res) => {
+    const formatId = Number(req.query.formatId);
+    const companyName = String((req.body || {}).companyName || "").trim();
+    const departmentName = String((req.body || {}).departmentName || "").trim();
+    const logoUrlRaw = (req.body || {}).logoUrl;
+    const logoUrl = logoUrlRaw == null ? "" : String(logoUrlRaw).trim();
+    if (!formatId) {
+      return res.status(400).json({ message: "formatId is required" });
+    }
+    if (!companyName || !departmentName) {
+      return res.status(400).json({ message: "companyName and departmentName are required" });
+    }
+    try {
+      const pool = await getPool();
+      await pool.request()
+        .input("formatId", sql.Int, formatId)
+        .input("companyName", sql.NVarChar(200), companyName.slice(0, 200))
+        .input("departmentName", sql.NVarChar(200), departmentName.slice(0, 200))
+        .input("logoUrl", sql.NVarChar(500), logoUrl ? logoUrl.slice(0, 500) : null)
+        .query(`
+          IF OBJECT_ID('dbo.format_header_branding', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'format_header_branding table not found. Run sql/16_format_header_branding.sql first.', 1;
+          END
+
+          MERGE dbo.format_header_branding AS t
+          USING (
+            SELECT
+              @formatId AS format_id,
+              @companyName AS company_name,
+              @departmentName AS department_name,
+              @logoUrl AS logo_url
+          ) AS s
+          ON t.format_id = s.format_id
+          WHEN MATCHED THEN
+            UPDATE SET
+              company_name = s.company_name,
+              department_name = s.department_name,
+              logo_url = s.logo_url,
+              active_flag = 1,
+              updated_at = SYSDATETIME()
+          WHEN NOT MATCHED THEN
+            INSERT (format_id, company_name, department_name, logo_url, active_flag)
+            VALUES (s.format_id, s.company_name, s.department_name, s.logo_url, 1);
+        `);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   /** Drawings + point checks for one part (admin; includes inactive) */
   app.get("/api/admin/part-detail", async (req, res) => {
     const formatId = Number(req.query.formatId);
@@ -82,7 +175,7 @@ function registerAdminRoutes(app, sql, getPool) {
           SELECT dr.drawing_ref_id AS drawingRefId, dr.process_code AS processCode, dr.drawing_no AS drawingNo,
                  dr.drawing_name AS drawingName, dr.file_url AS fileUrl, dr.note, dr.active_flag AS activeFlag
           FROM dbo.drawing_reference dr
-          LEFT JOIN dbo.format_process_master fpm
+          LEFT JOIN dbo.process_master fpm
             ON fpm.format_id = dr.format_id
             AND fpm.part_no = dr.part_no
             AND dr.process_code IS NOT NULL
@@ -101,7 +194,7 @@ function registerAdminRoutes(app, sql, getPool) {
           SELECT pcr.point_check_ref_id AS pointCheckRefId, pcr.process_code AS processCode, pcr.check_code AS checkCode,
                  pcr.check_point AS pointCheckText, pcr.criteria, pcr.check_method AS checkMethod, pcr.note, pcr.active_flag AS activeFlag
           FROM dbo.point_check_reference pcr
-          LEFT JOIN dbo.format_process_master fpm
+          LEFT JOIN dbo.process_master fpm
             ON fpm.format_id = pcr.format_id
             AND fpm.part_no = pcr.part_no
             AND pcr.process_code IS NOT NULL
@@ -135,7 +228,7 @@ function registerAdminRoutes(app, sql, getPool) {
     }
   });
 
-  /** New part: assembly drawing row + one initial process */
+  /** New part: part master row + one initial process */
   app.post("/api/admin/parts", async (req, res) => {
     const { formatId, partNo, partName, firstProcessName } = req.body || {};
     const pn = String(partNo || "").trim().toUpperCase();
@@ -153,7 +246,15 @@ function registerAdminRoutes(app, sql, getPool) {
       const dup = await new sql.Request(transaction)
         .input("formatId", sql.Int, Number(formatId))
         .input("partNo", sql.NVarChar(50), pn)
-        .query(`SELECT 1 AS x FROM dbo.format_process_master WHERE format_id=@formatId AND part_no=@partNo`);
+        .query(`
+          IF OBJECT_ID('dbo.part_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'part_master table not found. Run sql/17_part_master.sql first.', 1;
+          END
+          SELECT 1 AS x FROM dbo.process_master WHERE format_id=@formatId AND part_no=@partNo
+          UNION ALL
+          SELECT 1 AS x FROM dbo.part_master WHERE format_id=@formatId AND part_no=@partNo
+        `);
       if (dup.recordset.length) {
         await transaction.rollback();
         return res.status(409).json({ message: "partNo already exists for this format" });
@@ -164,21 +265,24 @@ function registerAdminRoutes(app, sql, getPool) {
       await new sql.Request(transaction)
         .input("formatId", sql.Int, Number(formatId))
         .input("partNo", sql.NVarChar(50), pn)
-        .input("processName", sql.NVarChar(200), proc0)
-        .input("displayOrder", sql.Int, ord)
+        .input("partName", sql.NVarChar(200), pname)
         .query(`
-          INSERT INTO dbo.format_process_master (format_id, part_no, process_name, display_order)
-          VALUES (@formatId, @partNo, @processName, @displayOrder)
+          IF OBJECT_ID('dbo.part_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'part_master table not found. Run sql/17_part_master.sql first.', 1;
+          END
+          INSERT INTO dbo.part_master (format_id, part_no, part_name, active_flag)
+          VALUES (@formatId, @partNo, @partName, 1)
         `);
 
       await new sql.Request(transaction)
         .input("formatId", sql.Int, Number(formatId))
-        .input("partNo", sql.NVarChar(100), pn)
-        .input("drawingNo", sql.NVarChar(100), `${pn}-ASM`)
-        .input("drawingName", sql.NVarChar(200), pname)
+        .input("partNo", sql.NVarChar(50), pn)
+        .input("processName", sql.NVarChar(200), proc0)
+        .input("displayOrder", sql.Int, ord)
         .query(`
-          INSERT INTO dbo.drawing_reference (format_id, part_no, process_code, drawing_no, drawing_name, file_url, note)
-          VALUES (@formatId, @partNo, NULL, @drawingNo, @drawingName, NULL, N'Registered from part master')
+          INSERT INTO dbo.process_master (format_id, part_no, process_name, display_order)
+          VALUES (@formatId, @partNo, @processName, @displayOrder)
         `);
 
       await transaction.commit();
@@ -191,7 +295,7 @@ function registerAdminRoutes(app, sql, getPool) {
 
   /**
    * Remove a part and all related rows: saved checksheets (header/process/row/checks),
-   * format_process_master, drawing_reference, point_check_reference, part_customer (if table exists).
+   * process_master, drawing_reference, point_check_reference, part_customer (if table exists).
    */
   app.delete("/api/admin/parts/:partNo", async (req, res) => {
     const pn = String(req.params.partNo || "").trim().toUpperCase();
@@ -206,7 +310,10 @@ function registerAdminRoutes(app, sql, getPool) {
         .input("formatId", sql.Int, formatId)
         .input("partNo", sql.NVarChar(100), pn)
         .query(`
-          SELECT 1 AS x FROM dbo.format_process_master
+          SELECT 1 AS x FROM dbo.process_master
+          WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo
+          UNION ALL
+          SELECT 1 AS x FROM dbo.part_master
           WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo
         `);
       if (!exists.recordset.length) {
@@ -248,7 +355,7 @@ function registerAdminRoutes(app, sql, getPool) {
         WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo
       `);
       await del(`
-        DELETE FROM dbo.format_process_master
+        DELETE FROM dbo.process_master
         WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo
       `);
       await del(`
@@ -262,6 +369,10 @@ function registerAdminRoutes(app, sql, getPool) {
       await del(`
         IF OBJECT_ID(N'dbo.part_customer', N'U') IS NOT NULL
           DELETE FROM dbo.part_customer WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo;
+      `);
+      await del(`
+        IF OBJECT_ID(N'dbo.part_master', N'U') IS NOT NULL
+          DELETE FROM dbo.part_master WHERE format_id = @formatId AND UPPER(LTRIM(RTRIM(part_no))) = @partNo;
       `);
 
       await transaction.commit();
@@ -289,7 +400,7 @@ function registerAdminRoutes(app, sql, getPool) {
         .input("processName", sql.NVarChar(200), pname)
         .input("displayOrder", sql.Int, ord)
         .query(`
-          INSERT INTO dbo.format_process_master (format_id, part_no, process_name, display_order)
+          INSERT INTO dbo.process_master (format_id, part_no, process_name, display_order)
           VALUES (@formatId, @partNo, @processName, @displayOrder)
         `);
       res.status(201).json({ ok: true, displayOrder: ord });
@@ -316,7 +427,7 @@ function registerAdminRoutes(app, sql, getPool) {
       }
       if (sets.length === 1) return res.status(400).json({ message: "nothing to update" });
       const rs = await reqSql.query(`
-        UPDATE dbo.format_process_master SET ${sets.join(", ")}
+        UPDATE dbo.process_master SET ${sets.join(", ")}
         WHERE process_master_id = @id;
         SELECT @@ROWCOUNT AS n;
       `);
@@ -341,7 +452,7 @@ function registerAdminRoutes(app, sql, getPool) {
         .input("formatId", sql.Int, formatId)
         .input("partNo", sql.NVarChar(50), partNo)
         .query(`
-          SELECT 1 AS x FROM dbo.format_process_master
+          SELECT 1 AS x FROM dbo.process_master
           WHERE process_master_id = @id AND format_id = @formatId AND part_no = @partNo
         `);
       if (!v.recordset.length) return res.status(404).json({ message: "not found" });
@@ -353,7 +464,7 @@ function registerAdminRoutes(app, sql, getPool) {
       }
       await pool.request()
         .input("id", sql.Int, id)
-        .query(`DELETE FROM dbo.format_process_master WHERE process_master_id = @id`);
+        .query(`DELETE FROM dbo.process_master WHERE process_master_id = @id`);
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ message: e.message });
@@ -621,7 +732,7 @@ function registerAdminRoutes(app, sql, getPool) {
     }
   });
 
-  /** Update part display name (assembly drawing row, process_code IS NULL) */
+  /** Update part display name on part master */
   app.patch("/api/admin/parts/:partNo/name", async (req, res) => {
     const partNo = String(req.params.partNo || "").trim().toUpperCase();
     const formatId = Number(req.query.formatId);
@@ -634,17 +745,32 @@ function registerAdminRoutes(app, sql, getPool) {
       const rs = await pool.request()
         .input("formatId", sql.Int, formatId)
         .input("partNo", sql.NVarChar(100), partNo)
-        .input("drawingName", sql.NVarChar(200), partName)
+        .input("partName", sql.NVarChar(200), partName)
         .query(`
-          UPDATE dbo.drawing_reference
-          SET drawing_name = @drawingName, updated_at = SYSDATETIME()
-          WHERE format_id = @formatId AND part_no = @partNo AND process_code IS NULL AND active_flag = 1;
+          IF OBJECT_ID('dbo.part_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'part_master table not found. Run sql/17_part_master.sql first.', 1;
+          END
+
+          UPDATE dbo.part_master
+          SET part_name = @partName, active_flag = 1, updated_at = SYSDATETIME()
+          WHERE format_id = @formatId
+            AND UPPER(LTRIM(RTRIM(part_no))) = @partNo
+          ;
           SELECT @@ROWCOUNT AS n;
         `);
       if (rs.recordset[0].n === 0) {
-        return res.status(404).json({ message: "assembly drawing row not found; create part first" });
+        await pool.request()
+          .input("formatId", sql.Int, formatId)
+          .input("partNo", sql.NVarChar(100), partNo)
+          .input("partName", sql.NVarChar(200), partName)
+          .query(`
+            INSERT INTO dbo.part_master (format_id, part_no, part_name, active_flag)
+            VALUES (@formatId, @partNo, @partName, 1)
+          `);
+        return res.json({ ok: true, created: true });
       }
-      res.json({ ok: true });
+      res.json({ ok: true, created: false });
     } catch (e) {
       res.status(500).json({ message: e.message });
     }
