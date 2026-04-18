@@ -170,7 +170,7 @@ Request:
 - `DELETE /admin/drawings/:drawingRefId?formatId=1&partNo=VDE1980` — Hard delete (includes part-wide / assembly rows; after removal, part display name in the catalog falls back to Part No until a new assembly row exists).
 
 ### 7.6 Point checks
-- `POST /admin/point-checks` — Required: `formatId`, `partNo`, `checkCode` (A–G), `pointCheckText`. Optional: `processCode` (omit for common), `criteria`, `checkMethod`, `note`.
+- `POST /admin/point-checks` — Required: `formatId`, `partNo`, `checkCode` (A–M), `pointCheckText`. Optional: `processCode` (omit for common), `criteria`, `checkMethod`, `note`.
 - `PATCH /admin/point-checks/:pointCheckRefId` — Partial update for the above fields and `activeFlag`.
 - `DELETE /admin/point-checks/:pointCheckRefId?formatId=1&partNo=VDE1980` — Hard delete.
 
@@ -186,5 +186,5 @@ Request:
 - `rowNo` in `1..31`
 - `qty` / `okCount` / `ngCount` ≥ 0
 - `okCount + ngCount <= qty` when `qty` is set
-- `checkCode` is `A..G`
+- `checksheet` row `checkCode` is `A..G` (entry grid); admin `point_check_reference` allows `A..M`
 - `result` is `OK` / `NG` / null

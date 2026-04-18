@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QC Check — Monthly History</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #d7deea;
+      --text: #1b2538;
+      --muted: #5f6c83;
+      --accent: #0b63d8;
+      --accent-strong: #084cad;
+    }
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    .app-shell { max-width: 1240px; margin: 20px auto; padding: 0 16px 24px; }
+    .hero {
+      background: linear-gradient(120deg, #ffffff, #eef4ff);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 6px 22px rgba(12, 45, 96, 0.08);
+      margin-bottom: 14px;
+    }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .brand-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-logo { height: 42px; width: auto; }
+    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: 0.2px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 0; }
+    a { color: var(--accent); }
+    .toolbar { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+    /* Single-line filter bar: compact widths; horizontal scroll only if viewport is very narrow */
+    .toolbar-filters {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    .toolbar-filters .fld { flex: 0 0 auto; min-width: 0; }
+    .toolbar-filters label {
+      display: block;
+      font-size: 11px;
+      color: #334160;
+      margin-bottom: 2px;
+      white-space: nowrap;
+    }
+    .toolbar-filters select,
+    .toolbar-filters button {
+      font-size: 12px;
+      padding: 5px 6px;
+      min-height: 30px;
+    }
+    .toolbar-filters #format { width: 132px; max-width: 38vw; min-width: 0; }
+    .toolbar-filters #partNo { width: 118px; max-width: 32vw; min-width: 0; }
+    .toolbar-filters #effYear { width: 64px; min-width: 0; }
+    .toolbar-filters #effMonth { width: 56px; min-width: 0; }
+    .toolbar-filters #process { width: 128px; max-width: 34vw; min-width: 0; }
+    .toolbar-filters #loadBtn { padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
+    label { display: block; font-size: 12px; color: #334160; margin-bottom: 4px; }
+    input, select, textarea {
+      padding: 7px 9px;
+      font-size: 14px;
+      box-sizing: border-box;
+      border: 1px solid #c9d4e8;
+      border-radius: 7px;
+      background: #fff;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(11, 99, 216, 0.12);
+    }
+    button {
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      border: 1px solid #0e57bb;
+      background: linear-gradient(180deg, #1a79ef, #0b63d8);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: transform 0.08s ease, box-shadow 0.12s ease, opacity 0.15s ease;
+    }
+    button:active { transform: translateY(1px) scale(0.985); }
+    button:hover { background: linear-gradient(180deg, #0f6de2, #0958c3); }
+    button.busy {
+      opacity: 0.88;
+      cursor: wait;
+      pointer-events: none;
+      box-shadow: 0 0 0 2px rgba(11, 99, 216, 0.2);
+    }
+    button.pressed-flash {
+      box-shadow: 0 0 0 3px rgba(11, 99, 216, 0.28);
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 12px;
+      margin-top: 0;
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(20, 46, 89, 0.05);
+    }
+    .panel h2 { margin: 0 0 10px; font-size: 16px; }
+    .err { color: #b00; font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+    .dch-scroll {
+      overflow-x: auto;
+      max-width: 100%;
+      margin-top: 4px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    table.dch { border-collapse: collapse; font-size: 11px; table-layout: fixed; width: max-content; min-width: 100%; }
+    table.dch th, table.dch td {
+      border: 1px solid var(--line);
+      padding: 4px 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    table.dch th { background: #ecf2fd; color: #2d3d5a; font-weight: 600; }
+    table.dch .machine-col { background: #f7faff; font-weight: 600; min-width: 56px; width: 56px; }
+    table.dch .day-head { min-width: 0; font-size: 11px; }
+    table.dch .sub-muted { font-weight: 500; font-size: 10px; background: #f2f6fc; color: #4a5b78; }
+    table.dch a.dch-part-link { color: var(--accent-strong); text-decoration: none; font-weight: 600; }
+    table.dch a.dch-part-link:hover { text-decoration: underline; }
+    table.dch .cell-ng { color: #b00; font-weight: 700; }
+    table.dch .cell-ok { color: #067c3a; font-weight: 700; font-size: 12px; }
+    table.dch td.empty-day { background: #fafbfd; color: #aab4c5; }
+    .page-footer {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f7faff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 900px) { .brand-logo { height: 36px; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="hero">
+      <div class="brand-row">
+        <div class="brand-left">
+          <img src="/assets/q-finder-logo.png" alt="Q-Finder" class="brand-logo" />
+          <div>
+            <h1>Monthly History</h1>
+          </div>
+        </div>
+        <p class="sub">
+          <a href="/">QC Check</a>
+          <span aria-hidden="true"> · </span>
+          <strong>Monthly History</strong>
+          <span aria-hidden="true"> · </span>
+          <a href="/admin.html">Master Data</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-filters">
+        <div class="fld">
+          <label for="format">Format</label>
+          <select id="format"></select>
+        </div>
+        <div class="fld">
+          <label for="partNo">Part No.</label>
+          <select id="partNo"></select>
+        </div>
+        <div class="fld">
+          <label for="effYear">Year</label>
+          <select id="effYear"></select>
+        </div>
+        <div class="fld">
+          <label for="effMonth">Month</label>
+          <select id="effMonth"></select>
+        </div>
+        <div class="fld">
+          <label for="process">Process</label>
+          <select id="process"></select>
+        </div>
+        <div class="fld">
+          <label class="visually-hidden" for="loadBtn">Load data</label>
+          <button type="button" id="loadBtn">Load</button>
+        </div>
+      </div>
+      <div id="err" class="err" aria-live="polite"></div>
+    </div>
+
+    <div class="panel">
+      <p id="titleMonth" class="muted" style="margin:0 0 8px;font-weight:600;color:var(--text);font-size:13px;"></p>
+      <div class="dch-scroll" id="tableHost"></div>
+    </div>
+
+    <div class="page-footer">
+      Q-Finder v1.0 powered by PT.BAHTERA HISISTEM INDONESIA
+    </div>
+  </div>
+
+  <script>
+    const ROWS_PER_RECORD = 3;
+    /** Aligns with Check Sheet entry grid (A–G only for saved results). */
+    const SHEET_CHECK_CODES = "ABCDEFG".split("");
+    const MONTH_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    function monthTitleEn(y, m) {
+      return `${MONTH_EN[m - 1]} ${y}`;
+    }
+
+    function flashButtonPress(btn) {
+      if (!btn) return;
+      btn.classList.add("pressed-flash");
+      setTimeout(() => btn.classList.remove("pressed-flash"), 260);
+    }
+
+    async function runActionWithButtonFeedback(buttonId, action) {
+      const btn = document.getElementById(buttonId);
+      if (!btn || btn.dataset.busy === "1") return;
+      btn.dataset.busy = "1";
+      btn.classList.add("busy");
+      flashButtonPress(btn);
+      btn.disabled = true;
+      try {
+        await action();
+      } finally {
+        btn.dataset.busy = "0";
+        btn.disabled = false;
+        btn.classList.remove("busy");
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
+
+    function fmtSheetDate(v) {
+      if (v == null || v === "") return "";
+      const s = typeof v === "string" ? v : String(v);
+      return s.length >= 10 ? s.slice(0, 10) : "";
+    }
+
+    function fmtSheetTime(v) {
+      if (v == null || v === "") return "";
+      if (typeof v === "object" && v instanceof Date && !Number.isNaN(v.getTime())) {
+        const h = v.getUTCHours();
+        const m = v.getUTCMinutes();
+        return `${pad2(h)}:${pad2(m)}`;
+      }
+      const s = String(v).trim();
+      const iso = s.match(/T(\d{2}):(\d{2})/);
+      if (iso) return `${iso[1]}:${iso[2]}`;
+      const hm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+      if (hm) return `${hm[1].padStart(2, "0")}:${hm[2]}`;
+      return "";
+    }
+
+    function checksObjectFromRow(sr) {
+      const o = Object.fromEntries(SHEET_CHECK_CODES.map((c) => [c, ""]));
+      for (const c of sr.checks || []) {
+        if (c && c.checkCode && Object.prototype.hasOwnProperty.call(o, c.checkCode)) {
+          o[c.checkCode] = String(c.result == null ? "" : c.result).trim();
+        }
+      }
+      return o;
+    }
+
+    function normalizeRound(v) {
+      const s = String(v || "").trim().toUpperCase();
+      if (s === "OK" || s === "〇" || s === "O" || s === "○") return "OK";
+      if (s === "NG" || s === "X" || s === "×" || s === "✕") return "NG";
+      return "";
+    }
+
+    function rowHasLineData(sr) {
+      if (!sr) return false;
+      const ck = checksObjectFromRow(sr);
+      if (sr.workDate && String(sr.workDate).trim() !== "") return true;
+      if (fmtSheetTime(sr.startTime) || fmtSheetTime(sr.finishTime)) return true;
+      for (const code of SHEET_CHECK_CODES) {
+        if (String(ck[code] || "").trim() !== "") return true;
+      }
+      return String(sr.remarks || "").trim() !== "";
+    }
+
+    function chunkRows(sortedRows) {
+      const chunks = [];
+      for (let i = 0; i < sortedRows.length; i += ROWS_PER_RECORD) {
+        chunks.push(sortedRows.slice(i, i + ROWS_PER_RECORD));
+      }
+      return chunks;
+    }
+
+    function recordHasData(chunk) {
+      return chunk.some((sr) => rowHasLineData(sr));
+    }
+
+    function ymKey(y, m) {
+      return `${y}-${pad2(m)}`;
+    }
+
+    function daysInMonth(y, m) {
+      return new Date(y, m, 0).getDate();
+    }
+
+    function monthDateIso(y, m, day) {
+      return `${y}-${pad2(m)}-${pad2(day)}`;
+    }
+
+    function parseFlexibleNumber(value) {
+      if (value == null) return null;
+      let s = String(value).trim();
+      if (!s) return null;
+      s = s
+        .replace(/\u3000/g, " ")
+        .replace(/[＋﹢]/g, "+")
+        .replace(/[－−—–﹣]/g, "-")
+        .replace(/\s+/g, "");
+      if (/^[+-]?\d+,\d+$/.test(s)) s = s.replace(",", ".");
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function getCheckRulesFromRefs(pointChecks, processName) {
+      const rules = {};
+      for (const c of SHEET_CHECK_CODES) {
+        rules[c] = { mode: "OKNG", min: null, max: null };
+      }
+      const list = Array.isArray(pointChecks) ? pointChecks : [];
+      const applyRule = (p) => {
+        const code = String(p && p.checkCode ? p.checkCode : "").trim();
+        if (!Object.prototype.hasOwnProperty.call(rules, code)) return;
+        const mode = String(p && p.inputMode ? p.inputMode : "OKNG").trim().toUpperCase();
+        rules[code] = {
+          mode: mode === "NUMERIC" ? "NUMERIC" : "OKNG",
+          min: parseFlexibleNumber(p && p.criteriaMin),
+          max: parseFlexibleNumber(p && p.criteriaMax)
+        };
+      };
+      for (const p of list) {
+        if (p && p.processCode) continue;
+        applyRule(p);
+      }
+      for (const p of list) {
+        if (!processName || String(p && p.processCode ? p.processCode : "") !== processName) continue;
+        applyRule(p);
+      }
+      return rules;
+    }
+
+    function isCheckValueAlert(value, rule) {
+      const mode = rule && rule.mode === "NUMERIC" ? "NUMERIC" : "OKNG";
+      if (mode === "OKNG") return String(value || "").trim().toUpperCase() === "NG";
+      const s = String(value ?? "").trim();
+      if (!s) return false;
+      const n = parseFlexibleNumber(value);
+      if (n == null || !Number.isFinite(n)) return true;
+      const rawMin = rule && rule.min != null ? Number(rule.min) : null;
+      const rawMax = rule && rule.max != null ? Number(rule.max) : null;
+      const absN = Math.abs(n);
+      const absMin = rawMin != null && Number.isFinite(rawMin) ? Math.abs(rawMin) : null;
+      const absMax = rawMax != null && Number.isFinite(rawMax) ? Math.abs(rawMax) : null;
+      if (absMin != null && absN < absMin) return true;
+      if (absMax != null && absN > absMax) return true;
+      return false;
+    }
+
+    function pickChunkTimes(chunk) {
+      const s0 = chunk[0] ? fmtSheetTime(chunk[0].startTime) : "";
+      const s1 = chunk[1] ? fmtSheetTime(chunk[1].startTime) : "";
+      const f0 = chunk[0] ? fmtSheetTime(chunk[0].finishTime) : "";
+      const f1 = chunk[1] ? fmtSheetTime(chunk[1].finishTime) : "";
+      const f2 = chunk[2] ? fmtSheetTime(chunk[2].finishTime) : "";
+      return { start: s0 || s1 || "", finish: f2 || f1 || f0 || "" };
+    }
+
+    /**
+     * One sheet line: 〇 if A–G are all filled and all OK (numeric: |Min| ≤ |n| ≤ |Max|); X if any NG or outside that / invalid; "" if no data or incomplete.
+     */
+    function computeLineOxMark(sr, rules) {
+      if (!sr) return "";
+      const ck = checksObjectFromRow(sr);
+      const codes = SHEET_CHECK_CODES;
+
+      for (const code of codes) {
+        const raw = ck[code];
+        const rule = rules[code] || { mode: "OKNG", min: null, max: null };
+        if (rule.mode === "NUMERIC") {
+          const t = String(raw || "").trim();
+          if (t && isCheckValueAlert(raw, rule)) return "X";
+        } else if (normalizeRound(raw) === "NG") {
+          return "X";
+        }
+      }
+
+      let anyFilled = false;
+      for (const code of codes) {
+        if (String(ck[code] || "").trim()) anyFilled = true;
+      }
+      if (!anyFilled) return "";
+
+      for (const code of codes) {
+        const raw = ck[code];
+        const t = String(raw || "").trim();
+        const rule = rules[code] || { mode: "OKNG", min: null, max: null };
+        if (rule.mode === "NUMERIC") {
+          if (!t) return "";
+          if (isCheckValueAlert(raw, rule)) return "X";
+        } else {
+          if (!t) return "";
+          if (normalizeRound(raw) !== "OK") return "X";
+        }
+      }
+      return "〇";
+    }
+
+    async function fetchPointChecks(formatId, partNo) {
+      const p = String(partNo || "").trim();
+      if (!p) return [];
+      const res = await fetch(
+        `/api/references?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(p)}`
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.pointChecks || [];
+    }
+
+    async function prefetchPointChecksByPart(formatId, partRows) {
+      const map = new Map();
+      await Promise.all(
+        (partRows || []).map(async (row) => {
+          const pno = String(row.partNo || "").trim();
+          if (!pno) return;
+          const pcs = await fetchPointChecks(formatId, pno);
+          map.set(pno.toUpperCase(), pcs);
+        })
+      );
+      return map;
+    }
+
+    /** @returns {Map<string, Map<string, Map<string, object>>>} machine -> part -> dateIso -> cell */
+    function buildMachineDayLines(processRows, y, m, partLabel, processName, pointChecks) {
+      const partKey = String(partLabel || "").trim() || "—";
+      const rules = getCheckRulesFromRefs(pointChecks || [], processName);
+      const sorted = [...(processRows || [])].sort((a, b) => (a.rowNo || 0) - (b.rowNo || 0));
+      const chunks = chunkRows(sorted);
+      const out = new Map();
+
+      for (const chunk of chunks) {
+        if (!recordHasData(chunk)) continue;
+        const head = chunk[0];
+        const wd = fmtSheetDate(head.workDate || (chunk[1] && chunk[1].workDate) || (chunk[2] && chunk[2].workDate));
+        if (!wd || wd.slice(0, 7) !== ymKey(y, m)) continue;
+
+        const machine = (head.machineNo != null && String(head.machineNo).trim() !== "")
+          ? String(head.machineNo).trim()
+          : "(unset)";
+
+        const { start, finish } = pickChunkTimes(chunk);
+
+        if (!out.has(machine)) out.set(machine, new Map());
+        const byPart = out.get(machine);
+        if (!byPart.has(partKey)) byPart.set(partKey, new Map());
+        const byDay = byPart.get(partKey);
+
+        const cell = {
+          item: partKey,
+          jumpProcessName: String(processName || "").trim(),
+          start,
+          finish,
+          d1: computeLineOxMark(chunk[0] || {}, rules),
+          d2: computeLineOxMark(chunk[1] || {}, rules),
+          d3: computeLineOxMark(chunk[2] || {}, rules)
+        };
+        byDay.set(wd, cell);
+      }
+      return out;
+    }
+
+    const ALL_PROC_PREFIX = "allproc:";
+
+    function mergeNestedMachinePartDay(into, from) {
+      for (const [machine, partMap] of from) {
+        if (!into.has(machine)) into.set(machine, new Map());
+        const im = into.get(machine);
+        for (const [part, dayMap] of partMap) {
+          if (!im.has(part)) im.set(part, new Map());
+          const idays = im.get(part);
+          for (const [day, cell] of dayMap) {
+            const prev = idays.get(day);
+            if (!prev) {
+              idays.set(day, cell);
+              continue;
+            }
+            const pPrev = String(prev.jumpProcessName || "").trim();
+            const pNew = String(cell.jumpProcessName || "").trim();
+            let jump = pNew || pPrev;
+            if (pPrev && pNew && pPrev.toUpperCase() !== pNew.toUpperCase()) {
+              jump = "";
+            }
+            idays.set(day, { ...cell, jumpProcessName: jump });
+          }
+        }
+      }
+    }
+
+    function findProcessByNameNorm(detail, targetNorm) {
+      return (detail.processes || []).find(
+        (p) => String(p.processName || "").trim().toUpperCase() === targetNorm
+      );
+    }
+
+    async function buildMergedHistoryForProcessName(formatId, effDate, targetNorm, y, m) {
+      const pr = await fetch(`/api/formats/${formatId}/parts`);
+      if (!pr.ok) throw new Error("Failed to load part list.");
+      const parts = await pr.json();
+      const pchMap = await prefetchPointChecksByPart(formatId, parts);
+      const merged = new Map();
+      const tasks = (parts || []).map(async (row) => {
+        const pno = String(row.partNo || "").trim();
+        if (!pno) return;
+        const res = await fetch(
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`
+        );
+        if (res.status === 404) return;
+        if (!res.ok) return;
+        const detail = await res.json();
+        const proc = findProcessByNameNorm(detail, targetNorm);
+        if (!proc || !Array.isArray(proc.rows)) return;
+        const partNoForItem = String(detail.partNo || pno).trim();
+        const pointChecks = pchMap.get(pno.toUpperCase()) || [];
+        const block = buildMachineDayLines(proc.rows, y, m, partNoForItem, proc.processName, pointChecks);
+        mergeNestedMachinePartDay(merged, block);
+      });
+      await Promise.all(tasks);
+      return merged;
+    }
+
+    async function buildMergedHistoryAllPartsAllProcesses(formatId, effDate, y, m) {
+      const pr = await fetch(`/api/formats/${formatId}/parts`);
+      if (!pr.ok) throw new Error("Failed to load part list.");
+      const parts = await pr.json();
+      const pchMap = await prefetchPointChecksByPart(formatId, parts);
+      const merged = new Map();
+      const tasks = (parts || []).map(async (row) => {
+        const pno = String(row.partNo || "").trim();
+        if (!pno) return;
+        const res = await fetch(
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`
+        );
+        if (res.status === 404) return;
+        if (!res.ok) return;
+        const detail = await res.json();
+        const partNoForItem = String(detail.partNo || pno).trim();
+        const pointChecks = pchMap.get(pno.toUpperCase()) || [];
+        for (const proc of detail.processes || []) {
+          if (!proc || !Array.isArray(proc.rows)) continue;
+          const block = buildMachineDayLines(proc.rows, y, m, partNoForItem, proc.processName, pointChecks);
+          mergeNestedMachinePartDay(merged, block);
+        }
+      });
+      await Promise.all(tasks);
+      return merged;
+    }
+
+    function entryUrlForPart(formatId, y, m, partNoRaw, processNameOpt) {
+      const partNo = String(partNoRaw || "").trim();
+      if (!partNo || !formatId) return "";
+      const q = new URLSearchParams({
+        formatId: String(formatId),
+        partNo,
+        effYear: String(y),
+        effMonth: pad2(m),
+        load: "1"
+      });
+      const proc = String(processNameOpt || "").trim();
+      if (proc) q.set("processName", proc);
+      return `./index.html?${q.toString()}`;
+    }
+
+    function partNoCellHtml(formatId, y, m, item, jumpProcessName) {
+      const raw = String(item || "").trim();
+      if (!raw) return "<td></td>";
+      const href = entryUrlForPart(formatId, y, m, raw, jumpProcessName);
+      if (!href) return `<td>${escapeHtml(raw)}</td>`;
+      return `<td><a class="dch-part-link" href="${escapeHtml(href)}">${escapeHtml(raw)}</a></td>`;
+    }
+
+    /** @param nestedMap Map<machine, Map<part, Map<dayIso, cell>>> */
+    function renderTable(y, m, nestedMap, formatId) {
+      const machines = [...nestedMap.keys()].sort((a, b) => a.localeCompare(b, "en"));
+      if (machines.length === 0) {
+        return "<p class=\"muted\" style=\"padding:12px;margin:0;\">No data to display. Check month, filters, and saved sheets.</p>";
+      }
+
+      const dim = daysInMonth(y, m);
+      const days = [];
+      for (let d = 1; d <= dim; d++) days.push(monthDateIso(y, m, d));
+
+      const colW = 28;
+      const innerCols = 6;
+
+      let thead1 = `<tr><th rowspan="2" class="machine-col">Machine</th>`;
+      let thead2 = `<tr>`;
+      for (const iso of days) {
+        const md = Number(iso.slice(8, 10));
+        thead1 += `<th colspan="${innerCols}" class="day-head">${MONTH_EN[m - 1]} ${md}</th>`;
+        thead2 += `
+          <th class="sub-muted" style="width:88px;">Part No.</th>
+          <th class="sub-muted" style="width:${colW}px;">Start</th>
+          <th class="sub-muted" style="width:${colW}px;">Finish</th>
+          <th class="sub-muted" style="width:${colW}px;">1st</th>
+          <th class="sub-muted" style="width:${colW}px;">2nd</th>
+          <th class="sub-muted" style="width:${colW}px;">3rd</th>
+        `;
+      }
+      thead1 += `</tr>`;
+      thead2 += `</tr>`;
+
+      let body = "";
+      for (const machine of machines) {
+        const partMap = nestedMap.get(machine);
+        const parts = [...partMap.keys()].sort((a, b) => a.localeCompare(b, "en"));
+        if (parts.length === 0) continue;
+        parts.forEach((part, slot) => {
+          body += "<tr>";
+          if (slot === 0) {
+            body += `<th class="machine-col" rowspan="${parts.length}">${escapeHtml(machine)}</th>`;
+          }
+          for (const iso of days) {
+            const dayMap = partMap.get(part);
+            const L = dayMap && dayMap.get(iso);
+            if (!L) {
+              body += `<td colspan="6" class="empty-day"></td>`;
+            } else {
+              const oxClass = (m) => (m === "X" ? "cell-ng" : m === "〇" ? "cell-ok" : "");
+              body += `
+                ${partNoCellHtml(formatId, y, m, L.item, L.jumpProcessName)}
+                <td>${escapeHtml(L.start)}</td>
+                <td>${escapeHtml(L.finish)}</td>
+                <td class="${oxClass(L.d1)}">${escapeHtml(L.d1)}</td>
+                <td class="${oxClass(L.d2)}">${escapeHtml(L.d2)}</td>
+                <td class="${oxClass(L.d3)}">${escapeHtml(L.d3)}</td>
+              `;
+            }
+          }
+          body += "</tr>";
+        });
+      }
+
+      return `<table class="dch"><thead>${thead1}${thead2}</thead><tbody>${body}</tbody></table>`;
+    }
+
+    async function loadFormats(sel) {
+      const res = await fetch("/api/formats");
+      const data = await res.json();
+      sel.innerHTML = data.map((f) =>
+        `<option value="${f.formatId}">${escapeHtml(f.formatCode)} — ${escapeHtml(f.formatName)}</option>`
+      ).join("");
+    }
+
+    async function loadParts(formatId, partSel) {
+      const res = await fetch(`/api/formats/${formatId}/parts`);
+      if (!res.ok) {
+        partSel.innerHTML = `<option value="" selected>ALL</option>`;
+        return;
+      }
+      const data = await res.json();
+      const opts = (data || []).map((p) => {
+        const no = escapeHtml(p.partNo);
+        return `<option value="${no}">${no} — ${escapeHtml(p.partName || "")}</option>`;
+      });
+      partSel.innerHTML = `<option value="" selected>ALL</option>${opts.join("")}`;
+    }
+
+    async function loadProcesses(formatId, partNo, procSel) {
+      const lead = `<option value="" selected>ALL</option>`;
+      const q = partNo ? `?partNo=${encodeURIComponent(partNo)}` : "";
+      const res = await fetch(`/api/formats/${formatId}/processes${q}`);
+      if (!res.ok) {
+        procSel.innerHTML = lead;
+        return;
+      }
+      const data = await res.json();
+      const rows = [...(data || [])].sort((a, b) => {
+        const pa = String(a.partNo || "").localeCompare(String(b.partNo || ""), "en");
+        if (pa !== 0) return pa;
+        return (a.displayOrder || 0) - (b.displayOrder || 0);
+      });
+      if (partNo) {
+        procSel.innerHTML =
+          lead +
+          rows
+            .map((p) => {
+              const pno = escapeHtml(p.partNo || "");
+              return `<option value="${p.processMasterId}" data-part-no="${pno}">${escapeHtml(p.processName)}</option>`;
+            })
+            .join("");
+        return;
+      }
+      const byNorm = new Map();
+      for (const p of rows) {
+        const raw = String(p.processName || "").trim();
+        if (!raw) continue;
+        const k = raw.toUpperCase();
+        if (!byNorm.has(k)) byNorm.set(k, raw);
+      }
+      const names = [...byNorm.keys()].sort().map((k) => byNorm.get(k));
+      procSel.innerHTML =
+        lead +
+        names
+          .map((name) => {
+            const enc = encodeURIComponent(name.toUpperCase());
+            return `<option value="${ALL_PROC_PREFIX}${enc}">${escapeHtml(name)}</option>`;
+          })
+          .join("");
+    }
+
+    function initYearMonth() {
+      const ySel = document.getElementById("effYear");
+      const mSel = document.getElementById("effMonth");
+      const yNow = new Date().getFullYear();
+      for (let y = yNow - 2; y <= yNow + 2; y++) {
+        ySel.innerHTML += `<option value="${y}">${y}</option>`;
+      }
+      ySel.value = String(yNow);
+      for (let m = 1; m <= 12; m++) {
+        mSel.innerHTML += `<option value="${pad2(m)}">${m}</option>`;
+      }
+      mSel.value = pad2(new Date().getMonth() + 1);
+    }
+
+    async function runLoad() {
+      const errEl = document.getElementById("err");
+      const host = document.getElementById("tableHost");
+      const titleEl = document.getElementById("titleMonth");
+      errEl.textContent = "";
+      host.innerHTML = "";
+      titleEl.textContent = "";
+
+      const formatId = Number(document.getElementById("format").value);
+      const partNoFilter = String(document.getElementById("partNo").value || "").trim();
+      const y = Number(document.getElementById("effYear").value);
+      const m = Number(document.getElementById("effMonth").value);
+      const procVal = document.getElementById("process").value;
+      const effDate = `${y}-${pad2(m)}-01`;
+
+      const procSel = document.getElementById("process");
+      const procOpt = procSel.selectedOptions[0];
+      const processIsAll = procVal === "";
+      const isAllByProcessName = !partNoFilter && !processIsAll && procVal.startsWith(ALL_PROC_PREFIX);
+
+      if (!formatId) {
+        errEl.textContent = "Select a format.";
+        return;
+      }
+      if (procSel.options.length === 0) {
+        errEl.textContent = "No process list could be loaded.";
+        return;
+      }
+
+      const procLabel = procOpt ? procOpt.textContent.trim() : "ALL";
+      const mt = monthTitleEn(y, m);
+
+      try {
+        if (!partNoFilter && processIsAll) {
+          titleEl.textContent = `${mt} — All parts · All processes (by machine)`;
+          const machineDayMap = await buildMergedHistoryAllPartsAllProcesses(formatId, effDate, y, m);
+          if (machineDayMap.size === 0) {
+            errEl.textContent =
+              "No rows matched (no saved sheets for that month, or no work date / machine / check data in lines).";
+            return;
+          }
+          host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+          return;
+        }
+
+        if (partNoFilter && processIsAll) {
+          titleEl.textContent = `${mt} — All processes (Part ${partNoFilter} · by machine)`;
+          const sheetRes = await fetch(
+            `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoFilter)}&effDate=${encodeURIComponent(effDate)}`
+          );
+          if (sheetRes.status === 404) {
+            errEl.textContent = "No saved sheet for this part and month. Load and save it on the entry screen first.";
+            return;
+          }
+          if (!sheetRes.ok) {
+            errEl.textContent = `Sheet request failed (${sheetRes.status})`;
+            return;
+          }
+          const detail = await sheetRes.json();
+          const partNoForItem = String(detail.partNo || partNoFilter).trim();
+          const pointChecks = await fetchPointChecks(formatId, partNoForItem);
+          const merged = new Map();
+          for (const proc of detail.processes || []) {
+            if (!proc || !Array.isArray(proc.rows)) continue;
+            mergeNestedMachinePartDay(
+              merged,
+              buildMachineDayLines(proc.rows, y, m, partNoForItem, proc.processName, pointChecks)
+            );
+          }
+          if (merged.size === 0) {
+            errEl.textContent = "This sheet has no displayable history rows.";
+            return;
+          }
+          host.innerHTML = renderTable(y, m, merged, formatId);
+          return;
+        }
+
+        if (isAllByProcessName) {
+          const targetNorm = decodeURIComponent(procVal.slice(ALL_PROC_PREFIX.length)).toUpperCase();
+          titleEl.textContent = `${mt} — All parts · ${procLabel} (by process name · by machine)`;
+          const machineDayMap = await buildMergedHistoryForProcessName(formatId, effDate, targetNorm, y, m);
+          if (machineDayMap.size === 0) {
+            errEl.textContent =
+              "No rows matched across parts (no sheets, process name mismatch, or no date / machine / check data).";
+            return;
+          }
+          host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+          return;
+        }
+
+        const procId = Number(procVal);
+        if (!Number.isFinite(procId) || procId < 1) {
+          errEl.textContent = "Invalid process selection.";
+          return;
+        }
+        const partNoFromProcess = String(procOpt.getAttribute("data-part-no") || "").trim();
+        const partNoForSheet = partNoFilter || partNoFromProcess;
+        if (!partNoForSheet) {
+          errEl.textContent = "Select a part, or with Part ALL choose a process name.";
+          return;
+        }
+
+        titleEl.textContent = `${mt} — ${procLabel} (Part ${partNoForSheet})`;
+
+        const sheetRes = await fetch(
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoForSheet)}&effDate=${encodeURIComponent(effDate)}`
+        );
+
+        if (sheetRes.status === 404) {
+          errEl.textContent = "No saved sheet for this part and month. Load and save it on the entry screen first.";
+          return;
+        }
+        if (!sheetRes.ok) {
+          errEl.textContent = `Sheet request failed (${sheetRes.status})`;
+          return;
+        }
+        const detail = await sheetRes.json();
+        const partNoForItem = String(detail.partNo || partNoForSheet).trim();
+
+        const proc = (detail.processes || []).find((p) => Number(p.processMasterId) === procId);
+        if (!proc || !Array.isArray(proc.rows)) {
+          errEl.textContent = "No row data for the selected process.";
+          return;
+        }
+
+        const pointChecks = await fetchPointChecks(formatId, partNoForItem);
+        const machineDayMap = buildMachineDayLines(
+          proc.rows,
+          y,
+          m,
+          partNoForItem,
+          proc.processName,
+          pointChecks
+        );
+        host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+      } catch (e) {
+        errEl.textContent = String(e && e.message ? e.message : e);
+      }
+    }
+
+    document.getElementById("format").addEventListener("change", async () => {
+      const fid = document.getElementById("format").value;
+      await loadParts(fid, document.getElementById("partNo"));
+      const partNo = document.getElementById("partNo").value;
+      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+    });
+
+    document.getElementById("partNo").addEventListener("change", async () => {
+      const fid = document.getElementById("format").value;
+      const partNo = document.getElementById("partNo").value;
+      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      runActionWithButtonFeedback("loadBtn", runLoad);
+    });
+
+    (async function init() {
+      initYearMonth();
+      const fmt = document.getElementById("format");
+      await loadFormats(fmt);
+      const fid = fmt.value;
+      await loadParts(fid, document.getElementById("partNo"));
+      const partNo = document.getElementById("partNo").value;
+      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+    })();
+  </script>
+</body>
+</html>

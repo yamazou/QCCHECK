@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QC Check Entry</title>
+  <title>QC Check</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 16px; }
     h1 { margin: 0; }
@@ -117,16 +117,34 @@
       align-items: center;
       min-height: 28px;
     }
+    .part-pick { display: flex; align-items: center; padding: 2px 6px 3px; }
+    .part-pick input[list] {
+      width: 50%;
+      min-width: 0;
+      font-size: 13px;
+      padding: 4px 6px;
+      box-sizing: border-box;
+      border: 1px solid #aab4c5;
+      border-radius: 3px;
+      background: #fff;
+    }
     .meta-row:last-child { border-bottom: 0; }
     .meta-row .k { padding: 2px 4px 2px 6px; font-weight: 600; font-size: 12px; }
     .meta-row .c { text-align: center; }
     .meta-row .v { padding: 2px 6px; }
     .meta-row input { border: 0; width: 100%; font-size: 13px; padding: 2px 0; }
-    .meta-row .v.part-dd { padding: 2px 6px 3px; }
-    .meta-row .v.part-dd select { width: 100%; font-size: 13px; padding: 4px 6px; box-sizing: border-box; }
-    .meta-row .v.part-pick { display: flex; gap: 6px; align-items: center; padding: 2px 6px 3px; }
-    .meta-row .v.part-pick select { flex: 1; min-width: 0; width: auto; font-size: 13px; padding: 4px 6px; }
-    .meta-row .v.part-pick button { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
+    .meta-row .v.part-dd { display: flex; align-items: center; padding: 2px 6px 3px; }
+    .meta-row .v.part-dd input[list] {
+      width: 50%;
+      min-width: 0;
+      font-size: 13px;
+      padding: 4px 6px;
+      box-sizing: border-box;
+      border: 1px solid #aab4c5;
+      border-radius: 3px;
+      background: #fff;
+    }
+    .meta-row .v.part-pick { padding: 2px 6px 3px; }
     .meta-row .v.eff-ym {
       display: flex;
       align-items: center;
@@ -163,10 +181,11 @@
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
     td input, td select { font-size: 12px; padding: 4px; }
-    .detail-sheet .num-col { min-width: 58px; }
-    .detail-sheet .pic-col { min-width: 92px; }
+    .detail-sheet .num-col { min-width: 52px; }
+    .detail-sheet .pic-col { min-width: 52px; }
     .sheet-table-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; }
     #tableWrap .detail-sheet td.check-col { min-width: 44px; vertical-align: middle; }
+    #tableWrap .detail-sheet td.check-col.check-alert-cell { background: #ffd7d7; }
     #tableWrap .detail-sheet td.check-col select {
       min-width: 40px;
       width: auto;
@@ -182,6 +201,12 @@
       justify-content: center;
       gap: 4px;
       min-width: 0;
+    }
+    #tableWrap .detail-sheet .date-cell-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
     }
     #tableWrap .detail-sheet .date-cell-wrap input[data-k="workDate"] {
       text-align: center;
@@ -228,8 +253,38 @@
       cursor: pointer;
       box-sizing: border-box;
     }
+    #tableWrap .detail-sheet .delete-record-btn {
+      width: 100%;
+      min-width: 84px;
+      padding: 4px 8px;
+      font-size: 11px;
+      line-height: 1.2;
+      border: 1px solid #c56;
+      border-radius: 3px;
+      background: #fff5f7;
+      color: #a0143b;
+      cursor: pointer;
+    }
+    #tableWrap .detail-sheet .delete-record-btn:hover {
+      background: #ffe9ef;
+    }
     .actions { margin-top: 12px; display: flex; gap: 8px; }
     button { padding: 8px 14px; cursor: pointer; }
+    button {
+      transition: transform 0.08s ease, box-shadow 0.12s ease, opacity 0.15s ease;
+    }
+    button:active {
+      transform: translateY(1px) scale(0.985);
+    }
+    button.busy {
+      opacity: 0.88;
+      cursor: wait;
+      pointer-events: none;
+      box-shadow: 0 0 0 2px rgba(11, 99, 216, 0.2);
+    }
+    button.pressed-flash {
+      box-shadow: 0 0 0 3px rgba(11, 99, 216, 0.28);
+    }
     .ref-wrap { margin-top: 12px; display: grid; grid-template-columns: 7fr 3fr; gap: 12px; }
     #tableWrap { margin-top: 10px; }
     .panel { border: 1px solid #ccc; padding: 8px; }
@@ -434,7 +489,7 @@
 </head>
 <body>
   <div id="printRoot" class="print-root" aria-hidden="true"></div>
-  <p class="admin-nav"><a href="/admin.html">Master Data Management</a></p>
+  <p class="admin-nav"><strong>QC Check</strong> · <a href="/daily-check-history.html">Monthly History</a> · <a href="/admin.html">Master Data</a></p>
   <div class="screen-sheet">
     <div class="header-sheet">
     <div class="header-main">
@@ -446,8 +501,14 @@
       <div class="header-col-meta">
         <div class="header-title-row"><h1>CHECK SHEET PRODUCTION</h1></div>
         <div class="meta-box">
-          <div class="meta-row"><div class="k">Part Name</div><div class="c">:</div><div class="v part-dd"><select id="partNameSelect"></select></div></div>
-          <div class="meta-row"><div class="k">Part No</div><div class="c">:</div><div class="v part-pick"><select id="partNoSelect"></select></div></div>
+          <div class="meta-row"><div class="k">Part Name</div><div class="c">:</div><div class="v part-dd">
+            <input id="partNameSelect" list="partNameDatalist" autocomplete="off" />
+            <datalist id="partNameDatalist"></datalist>
+          </div></div>
+          <div class="meta-row"><div class="k">Part No</div><div class="c">:</div><div class="v part-pick">
+            <input id="partNoSelect" list="partNoDatalist" autocomplete="off" />
+            <datalist id="partNoDatalist"></datalist>
+          </div></div>
           <div class="meta-row"><div class="k">Eff date</div><div class="c">:</div><div class="v eff-ym"><select id="effYear" aria-label="Year (Gregorian)"></select><span class="eff-sep">/</span><select id="effMonth" aria-label="Month"></select><button type="button" id="loadSheetBtn">Load</button></div></div>
           <div class="meta-row"><div class="k">Rev No</div><div class="c">:</div><div class="v"><input id="revNo" /></div></div>
           <div class="meta-row"><div class="k">Process</div><div class="c">:</div><div class="v"><span id="headerProcessName">-</span></div></div>
@@ -488,8 +549,6 @@
         <div class="footer-left">
           <div class="footer-note">
             <div class="ttl">Keterangan :</div>
-            <div>1. Beri tanda (&radic;) jika kondisi OK</div>
-            <div>2. Beri tanda (X) jika kondisi NG</div>
           </div>
           <div class="remarks-grid">
             <table>
@@ -581,6 +640,9 @@
       selectedProcessIndex: 0,
       rowsByProcess: {},
       partNamesByNo: {},
+      partNameLabelByNo: {},
+      partNameOptions: [],
+      partNoOptions: [],
       headerBranding: null,
       editingHeaderId: null
     };
@@ -606,8 +668,20 @@
       if (deptInput) deptInput.value = department;
     }
 
+    const ROWS_PER_RECORD = 3;
+    /** Sheet entry columns (results) — A–G only for now. Point-check master can be A–M; see renderReferences. */
+    const SHEET_CHECK_CODES = "ABCDEFG".split("");
+    const EMPTY_CHECKS = () => Object.fromEntries(SHEET_CHECK_CODES.map((c) => [c, ""]));
+
+    /** Order rows in the Point Check reference table (master codes A–M). */
+    function rankMasterPointCheckCode(cc) {
+      const x = String(cc == null ? "" : cc).trim().toUpperCase();
+      if (x.length === 1 && x >= "A" && x <= "M") return x.charCodeAt(0);
+      return 10000;
+    }
+
     function rowHasSheetData(r) {
-      const hasChecks = ["A", "B", "C", "D", "E", "F", "G"].some((code) => r.checks[code]);
+      const hasChecks = SHEET_CHECK_CODES.some((code) => r.checks[code]);
       const hasWorkDate = r.workDate != null && String(r.workDate).trim() !== "";
       return (
         hasChecks ||
@@ -617,7 +691,9 @@
         r.qty !== "" ||
         r.okCount !== "" ||
         r.ngCount !== "" ||
+        r.machineNo ||
         r.pic ||
+        !!r.sopCheck ||
         r.leaderCheck ||
         r.remarks
       );
@@ -636,6 +712,83 @@
       return `<iframe src="${withCacheBuster}" title="Drawing preview"></iframe>`;
     }
 
+    function normalizeProcessName(s) {
+      let v = String(s || "").trim().replace(/^\s*:\s*/, "");
+      try {
+        v = v.normalize("NFKC");
+      } catch (_e) {
+        /* ignore */
+      }
+      v = v.replace(/[\u200B-\u200D\uFEFF]/g, "");
+      v = v.replaceAll(/\s+/g, " ").toUpperCase();
+      // Sawing: Excel line breaks or typos vs drawing_reference "SAWING".
+      v = v.replace(/\bSAWNING\b/g, "SAWING");
+      v = v.replace(/\bSAW\s+ING\b/g, "SAWING");
+      // Excel typo: "Tapping Me" / "TAPPING ME" → M3 tap step.
+      v = v.replace(/\bTAPPING\s+ME\b/g, "TAPPING M3");
+      // Normalize common typos found in master data.
+      v = v.replaceAll("PUNHCING", "PUNCHING");
+      v = v.replaceAll("PNCHING", "PUNCHING");
+      // Some masters omit "ING": "PUNCH PROGRESSIVE" vs drawing rows "PUNCHING PROGRESSIVE".
+      v = v.replace(/\bPUNCH\s+PROGRESSIVE\b/g, "PUNCHING PROGRESSIVE");
+      // Common typo: "PROSESS" / "PORSESS" instead of "PROCESS" in step titles.
+      v = v.replace(/\bPROSESS\b/g, "PROCESS");
+      v = v.replace(/\bPORSESS\b/g, "PROCESS");
+      // Some masters use "AND" or fullwidth ampersand instead of "&".
+      v = v.replace(/\uFF06/g, "&");
+      v = v.replace(/\sAND\s/g, " & ");
+      v = v.replace(/(\S)&(\S)/g, "$1 & $2");
+      // Normalize "+" representation/spacing, e.g. "1/2 +", "1/2＋" -> "1/2+".
+      v = v.replaceAll("＋", "+");
+      v = v.replaceAll(/\s*\+\s*/g, "+");
+      // Excel / IME: fullwidth or fraction slash in "1/2" step names.
+      v = v.replace(/\uFF0F/g, "/");
+      v = v.replace(/\u2044/g, "/");
+      return v;
+    }
+
+    /** Point checks: same process tab as row only (no parent/child step mixing). Drawings still use processNameMatches. */
+    function pointCheckProcessMatchesTab(tabProcessName, rowProcessCode) {
+      const row = rowProcessCode == null ? "" : String(rowProcessCode).trim();
+      if (!row) return false;
+      const a = normalizeProcessName(tabProcessName);
+      const b = normalizeProcessName(row);
+      if (!a || !b) return false;
+      if (a === b) return true;
+      const aNoPlus = a.replaceAll(/\+$/g, "");
+      const bNoPlus = b.replaceAll(/\+$/g, "");
+      return aNoPlus === bNoPlus;
+    }
+
+    /**
+     * Match process tab name to a reference row's process_code (drawings only — fuzzy step variants).
+     * @param {object} [options]
+     * @param {boolean} [options.allowRefPrefixOfSelected=true] Ref shorter than tab + step suffix, e.g. drawing "HOLE" vs tab "HOLE 1/2".
+     */
+    function processNameMatches(selectedName, refName, options) {
+      const opts = options && typeof options === "object" ? options : {};
+      const allowRefPrefixOfSelected = opts.allowRefPrefixOfSelected !== false;
+      const a = normalizeProcessName(selectedName);
+      const b = normalizeProcessName(refName);
+      if (!a || !b) return false;
+      if (a === b) return true;
+      const isStepSuffix = (suffix) => /^(\d+\/\d+|\d+)$/.test(String(suffix || "").trim());
+      // Treat optional trailing "+" as equivalent for step names.
+      const aNoPlus = a.replaceAll(/\+$/g, "");
+      const bNoPlus = b.replaceAll(/\+$/g, "");
+      if (aNoPlus && aNoPlus === bNoPlus) return true;
+      // Tab is a prefix of ref + step token, e.g. tab "SAWING" matches ref "SAWING 1/2" (drawings).
+      if (aNoPlus && bNoPlus.startsWith(aNoPlus + " ")) {
+        const suffix = bNoPlus.slice(aNoPlus.length + 1).trim();
+        if (isStepSuffix(suffix)) return true;
+      }
+      if (allowRefPrefixOfSelected && bNoPlus && aNoPlus.startsWith(bNoPlus + " ")) {
+        const suffix = aNoPlus.slice(bNoPlus.length + 1).trim();
+        if (isStepSuffix(suffix)) return true;
+      }
+      return false;
+    }
+
     function renderReferences() {
       const drawingPreview = document.getElementById("drawingPreview");
       const pointWrap = document.getElementById("pointCheckWrap");
@@ -643,12 +796,12 @@
       const selectedProcess = state.processes[state.selectedProcessIndex];
       const selectedProcessName = selectedProcess ? selectedProcess.processName : null;
       const drawings = (state.references.drawings || []).filter((d) =>
-        !selectedProcessName || !d.processCode || d.processCode === selectedProcessName
+        !selectedProcessName || !d.processCode || processNameMatches(selectedProcessName, d.processCode)
       );
       if (!drawings.length) {
         drawingPreview.textContent = "No reference drawing";
       } else {
-        const processSpecific = drawings.find((d) => d.processCode === selectedProcessName);
+        const processSpecific = drawings.find((d) => d.processCode && processNameMatches(selectedProcessName, d.processCode));
         const selected = processSpecific || drawings[0];
         drawingPreview.innerHTML = getDrawingPreviewHtml(selected);
         if (selected && selected.fileUrl && selected.fileUrl.startsWith("excel://")) {
@@ -674,23 +827,36 @@
         }
       }
 
-      const pointChecks = (state.references.pointChecks || []).filter((p) =>
-        !selectedProcessName || !p.processCode || p.processCode === selectedProcessName
+      let pointChecks = (state.references.pointChecks || []).filter((p) =>
+        !selectedProcessName ||
+        !p.processCode ||
+        pointCheckProcessMatchesTab(selectedProcessName, p.processCode)
       );
+      pointChecks = [...pointChecks].sort((a, b) => {
+        const d = rankMasterPointCheckCode(a.checkCode) - rankMasterPointCheckCode(b.checkCode);
+        if (d !== 0) return d;
+        return (Number(a.pointCheckRefId) || 0) - (Number(b.pointCheckRefId) || 0);
+      });
       if (!pointChecks.length) {
         pointWrap.innerHTML = "<div style='font-size:12px;color:#777;'>No point checks</div>";
       } else {
         pointWrap.innerHTML = `<table>
           <thead>
-            <tr><th>No</th><th colspan="2">Dimensi</th><th>Alat Bantu</th></tr>
+            <tr><th>No</th><th colspan="3">Dimensi</th><th>Alat Bantu</th></tr>
           </thead>
           <tbody>
-            ${pointChecks.map(p => `<tr>
-              <td>${p.checkCode}</td>
-              <td style="text-align:left;">${p.pointCheckText || ""}</td>
-              <td style="text-align:left;">${p.criteria || ""}</td>
-              <td>${p.checkMethod || ""}</td>
-            </tr>`).join("")}
+            ${pointChecks.map((p) => {
+              const criteriaCells = getPointCriteriaCells(p);
+              const criteriaTd = criteriaCells.hasRange
+                ? `<td style="text-align:center;">${criteriaCells.min}</td><td style="text-align:center;">${criteriaCells.max}</td>`
+                : `<td colspan="2" style="text-align:center;">${criteriaCells.text}</td>`;
+              return `<tr>
+                <td>${p.checkCode}</td>
+                <td style="text-align:center;">${p.pointCheckText || ""}</td>
+                ${criteriaTd}
+                <td>${p.checkMethod || ""}</td>
+              </tr>`;
+            }).join("")}
           </tbody>
         </table>
         <div style="font-size:12px;margin-top:6px;color:#555;">${pointChecks.length} point check item(s)</div>`;
@@ -703,8 +869,118 @@
       }
     }
 
+    function getCheckInputModesForSelectedProcess() {
+      const modeMap = Object.fromEntries(SHEET_CHECK_CODES.map((c) => [c, "OKNG"]));
+      const selectedProcess = state.processes[state.selectedProcessIndex];
+      const selectedProcessName = selectedProcess ? selectedProcess.processName : null;
+      const pointChecks = state.references && Array.isArray(state.references.pointChecks)
+        ? state.references.pointChecks
+        : [];
 
-    const EMPTY_CHECKS = () => ({ A: "", B: "", C: "", D: "", E: "", F: "", G: "" });
+      // Apply common rows first, then selected-process rows override them.
+      for (const p of pointChecks) {
+        const code = String(p && p.checkCode ? p.checkCode : "").trim();
+        if (!Object.prototype.hasOwnProperty.call(modeMap, code)) continue;
+        if (p && p.processCode) continue;
+        const mode = String(p && p.inputMode ? p.inputMode : "OKNG").trim().toUpperCase();
+        modeMap[code] = mode === "NUMERIC" ? "NUMERIC" : "OKNG";
+      }
+      for (const p of pointChecks) {
+        const code = String(p && p.checkCode ? p.checkCode : "").trim();
+        if (!Object.prototype.hasOwnProperty.call(modeMap, code)) continue;
+        if (!selectedProcessName || !p.processCode || !pointCheckProcessMatchesTab(selectedProcessName, p.processCode)) continue;
+        const mode = String(p && p.inputMode ? p.inputMode : "OKNG").trim().toUpperCase();
+        modeMap[code] = mode === "NUMERIC" ? "NUMERIC" : "OKNG";
+      }
+      return modeMap;
+    }
+
+    function parseFlexibleNumber(value) {
+      if (value == null) return null;
+      let s = String(value).trim();
+      if (!s) return null;
+      s = s
+        .replace(/\u3000/g, " ")
+        .replace(/[＋﹢]/g, "+")
+        .replace(/[－−—–﹣]/g, "-")
+        .replace(/\s+/g, "");
+      if (/^[+-]?\d+,\d+$/.test(s)) s = s.replace(",", ".");
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function getCheckRulesForSelectedProcess() {
+      const rules = Object.fromEntries(
+        SHEET_CHECK_CODES.map((c) => [c, { mode: "OKNG", min: null, max: null }])
+      );
+      const selectedProcess = state.processes[state.selectedProcessIndex];
+      const selectedProcessName = selectedProcess ? selectedProcess.processName : null;
+      const pointChecks = state.references && Array.isArray(state.references.pointChecks)
+        ? state.references.pointChecks
+        : [];
+
+      const applyRule = (p) => {
+        const code = String(p && p.checkCode ? p.checkCode : "").trim();
+        if (!Object.prototype.hasOwnProperty.call(rules, code)) return;
+        const mode = String(p && p.inputMode ? p.inputMode : "OKNG").trim().toUpperCase();
+        rules[code] = {
+          mode: mode === "NUMERIC" ? "NUMERIC" : "OKNG",
+          min: parseFlexibleNumber(p && p.criteriaMin),
+          max: parseFlexibleNumber(p && p.criteriaMax)
+        };
+      };
+
+      for (const p of pointChecks) {
+        if (p && p.processCode) continue;
+        applyRule(p);
+      }
+      for (const p of pointChecks) {
+        if (!selectedProcessName || !p.processCode || !pointCheckProcessMatchesTab(selectedProcessName, p.processCode)) continue;
+        applyRule(p);
+      }
+      return rules;
+    }
+
+    function isCheckValueAlert(value, rule) {
+      const mode = rule && rule.mode === "NUMERIC" ? "NUMERIC" : "OKNG";
+      if (mode === "OKNG") return String(value || "").trim().toUpperCase() === "NG";
+      const s = String(value ?? "").trim();
+      if (!s) return false;
+      const n = parseFlexibleNumber(value);
+      if (n == null || !Number.isFinite(n)) return true;
+      const rawMin = rule && rule.min != null ? Number(rule.min) : null;
+      const rawMax = rule && rule.max != null ? Number(rule.max) : null;
+      const absN = Math.abs(n);
+      const absMin = rawMin != null && Number.isFinite(rawMin) ? Math.abs(rawMin) : null;
+      const absMax = rawMax != null && Number.isFinite(rawMax) ? Math.abs(rawMax) : null;
+      if (absMin != null && absN < absMin) return true;
+      if (absMax != null && absN > absMax) return true;
+      return false;
+    }
+
+    function formatSignedCriteriaValue(value) {
+      if (value == null) return "";
+      const num = Number(value);
+      if (!Number.isFinite(num)) return String(value).trim();
+      const abs = Math.abs(num);
+      const fixed = abs.toFixed(4).replace(/\.?0+$/, "");
+      return num < 0 ? `-${fixed}` : `+${fixed}`;
+    }
+
+    function getPointCriteriaCells(p) {
+      const hasMin = p && p.criteriaMin != null && String(p.criteriaMin).trim() !== "";
+      const hasMax = p && p.criteriaMax != null && String(p.criteriaMax).trim() !== "";
+      if (hasMin || hasMax) {
+        return {
+          hasRange: true,
+          min: hasMin ? formatSignedCriteriaValue(p.criteriaMin) : "",
+          max: hasMax ? formatSignedCriteriaValue(p.criteriaMax) : "",
+          text: ""
+        };
+      }
+      const text = p && p.criteria != null ? String(p.criteria).trim() : "";
+      return { hasRange: false, min: "", max: "", text };
+    }
 
     function normalizeWorkDateInput(raw) {
       const s = String(raw || "").trim();
@@ -719,10 +995,99 @@
 
     function defaultRow(rowNo) {
       return {
-        rowNo, workDate: "", startTime: "", finishTime: "", qty: "", okCount: "", ngCount: "", pic: "",
+        rowNo, workDate: "", startTime: "", finishTime: "", qty: "", okCount: "", ngCount: "", machineNo: "", pic: "",
+        sopCheck: false,
         leaderCheck: "", remarks: "",
         checks: EMPTY_CHECKS()
       };
+    }
+
+    function rowHasHeaderData(r) {
+      if (!r) return false;
+      return (
+        (r.workDate != null && String(r.workDate).trim() !== "") ||
+        !!r.startTime ||
+        !!r.finishTime ||
+        r.qty !== "" ||
+        r.okCount !== "" ||
+        r.ngCount !== "" ||
+        !!r.machineNo ||
+        !!r.sopCheck ||
+        !!r.pic
+      );
+    }
+
+    function normalizeSavedRowsToRecordRows(savedRows) {
+      if (!Array.isArray(savedRows) || savedRows.length === 0) return createEmptyRecordRows(1);
+      const normalized = [];
+      let recordBuffer = [];
+
+      for (const row of savedRows) {
+        const startsNewRecord = rowHasHeaderData(row) && recordBuffer.length > 0;
+        if (startsNewRecord) {
+          while (recordBuffer.length < ROWS_PER_RECORD) recordBuffer.push(defaultRow(0));
+          normalized.push(...recordBuffer.slice(0, ROWS_PER_RECORD));
+          recordBuffer = [];
+        }
+        recordBuffer.push(row);
+        if (recordBuffer.length === ROWS_PER_RECORD) {
+          normalized.push(...recordBuffer);
+          recordBuffer = [];
+        }
+      }
+
+      if (recordBuffer.length > 0) {
+        while (recordBuffer.length < ROWS_PER_RECORD) recordBuffer.push(defaultRow(0));
+        normalized.push(...recordBuffer.slice(0, ROWS_PER_RECORD));
+      }
+
+      return normalized;
+    }
+
+    function renumberRows(rows) {
+      rows.forEach((r, idx) => {
+        r.rowNo = idx + 1;
+      });
+    }
+
+    function createEmptyRecordRows(startNo) {
+      return Array.from({ length: ROWS_PER_RECORD }, (_unused, idx) => defaultRow(startNo + idx));
+    }
+
+    function ensureRecordRows(rows) {
+      if (!Array.isArray(rows)) return createEmptyRecordRows(1);
+      if (rows.length === 0) {
+        rows.push(...createEmptyRecordRows(1));
+        return rows;
+      }
+      while (rows.length % ROWS_PER_RECORD !== 0) {
+        rows.push(defaultRow(rows.length + 1));
+      }
+      renumberRows(rows);
+      return rows;
+    }
+
+    function ensureTrailingBlankRecord(rows) {
+      ensureRecordRows(rows);
+      const start = Math.max(0, rows.length - ROWS_PER_RECORD);
+      const lastRecordHasData = rows.slice(start).some((r) => rowHasSheetData(r));
+      if (lastRecordHasData) {
+        rows.push(...createEmptyRecordRows(rows.length + 1));
+      }
+      renumberRows(rows);
+    }
+
+    function collapseTrailingBlankRecords(rows) {
+      ensureRecordRows(rows);
+      while (rows.length > ROWS_PER_RECORD * 2) {
+        const lastStart = rows.length - ROWS_PER_RECORD;
+        const prevStart = rows.length - ROWS_PER_RECORD * 2;
+        const lastBlank = rows.slice(lastStart).every((r) => !rowHasSheetData(r));
+        const prevBlank = rows.slice(prevStart, lastStart).every((r) => !rowHasSheetData(r));
+        if (!lastBlank || !prevBlank) break;
+        rows.splice(lastStart, ROWS_PER_RECORD);
+      }
+      renumberRows(rows);
     }
 
     function ensureRowChecks(r) {
@@ -731,9 +1096,8 @@
         return r.checks;
       }
       const base = EMPTY_CHECKS();
-      for (const c of ["A", "B", "C", "D", "E", "F", "G"]) {
-        const t = String(r.checks[c] == null ? "" : r.checks[c]).trim();
-        base[c] = t === "OK" || t === "NG" ? t : "";
+      for (const c of SHEET_CHECK_CODES) {
+        base[c] = String(r.checks[c] == null ? "" : r.checks[c]).trim().slice(0, 50);
       }
       r.checks = base;
       return r.checks;
@@ -759,6 +1123,7 @@
           updateHeaderProcess();
           renderReferences();
           renderTable();
+          flashButtonPress(document.querySelector(`.tab[data-idx="${state.selectedProcessIndex}"]`));
         };
       });
     }
@@ -777,64 +1142,101 @@
       }
       const p = state.processes[state.selectedProcessIndex];
       const key = p.processMasterId;
-      if (!state.rowsByProcess[key]) state.rowsByProcess[key] = Array.from({ length: 31 }, (_, i) => defaultRow(i + 1));
-      const rows = state.rowsByProcess[key];
+      if (!state.rowsByProcess[key]) state.rowsByProcess[key] = createEmptyRecordRows(1);
+      const rows = ensureRecordRows(state.rowsByProcess[key]);
       for (const r of rows) ensureRowChecks(r);
+      ensureTrailingBlankRecord(rows);
+      const recordCount = Math.ceil(rows.length / ROWS_PER_RECORD);
+      const checkRules = getCheckRulesForSelectedProcess();
+      const checkInputModes = Object.fromEntries(
+        Object.entries(checkRules).map(([code, rule]) => [code, rule.mode])
+      );
+      for (const r of rows) {
+        for (const code of SHEET_CHECK_CODES) {
+          const mode = checkInputModes[code] === "NUMERIC" ? "NUMERIC" : "OKNG";
+          const value = String(r.checks[code] == null ? "" : r.checks[code]).trim();
+          if (mode === "OKNG") {
+            r.checks[code] = value === "OK" || value === "NG" ? value : "";
+          } else {
+            r.checks[code] = value.slice(0, 50);
+          }
+        }
+      }
 
       wrap.innerHTML = `<div class="sheet-table-scroll"><table class="detail-sheet">
           <colgroup>
             <col style="width:42px;">
             <col style="width:92px;">
+            <col style="width:60px;">
+            <col style="width:60px;">
             <col style="width:74px;">
-            <col style="width:74px;">
-            <col style="width:58px;">
-            <col style="width:58px;">
-            <col style="width:58px;">
-            <col style="width:96px;">
-            <col span="7">
+            <col style="width:52px;">
+            <col style="width:52px;">
+            <col style="width:52px;">
+            <col style="width:52px;">
+            <col style="width:88px;">
+            <col span="${SHEET_CHECK_CODES.length}">
             <col style="width:118px;">
-            <col style="width:340px;">
+            <col style="width:626px;">
           </colgroup>
           <thead>
             <tr>
-              <th>No</th><th>Date</th><th>Start</th><th>Finish</th><th>Qty</th><th>OK</th><th>NG</th><th>PIC</th>
-              <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>Leader Check</th><th>Remarks</th>
+              <th>No</th><th>Date</th><th>Machine No</th><th>Start</th><th>Finish</th><th>Qty</th><th>OK</th><th>NG</th><th>PIC</th><th>SOP Check</th>
+              ${SHEET_CHECK_CODES.map((c) => `<th>${c}</th>`).join("")}<th>Leader Check</th><th>Remarks</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.map((r, i) => {
-              const ck = r.checks;
-              const datePickVal = r.workDate && /^\d{4}-\d{2}-\d{2}$/.test(r.workDate) ? r.workDate : "";
-              return `
-              <tr>
-                <td>${r.rowNo}</td>
-                <td class="date-cell">
-                  <div class="date-cell-wrap">
-                    <input type="text" data-i="${i}" data-k="workDate" value="${r.workDate || ""}" placeholder="----/--/--" maxlength="10" autocomplete="off" />
-                    <label class="work-date-cal-label" title="Calendar" aria-label="Pick date">
-                      <span class="work-date-cal-icon" aria-hidden="true">&#128197;</span>
-                      <input type="date" class="work-date-picker" data-i="${i}" value="${datePickVal}" />
-                    </label>
-                  </div>
-                </td>
-                <td><input type="time" data-i="${i}" data-k="startTime" value="${r.startTime || ""}"></td>
-                <td><input type="time" data-i="${i}" data-k="finishTime" value="${r.finishTime || ""}"></td>
-                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="qty" value="${r.qty}"></td>
-                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="okCount" value="${r.okCount}"></td>
-                <td class="num-col"><input type="text" inputmode="numeric" data-i="${i}" data-k="ngCount" value="${r.ngCount}"></td>
-                <td class="pic-col"><input data-i="${i}" data-k="pic" value="${r.pic || ""}"></td>
-                ${["A","B","C","D","E","F","G"].map((code) => `
-                  <td class="check-col">
-                    <select data-i="${i}" data-k="check_${code}" aria-label="Check ${code}">
-                      <option value="" ${ck[code] === "" ? "selected" : ""}></option>
-                      <option value="OK" ${ck[code] === "OK" ? "selected" : ""}>OK</option>
-                      <option value="NG" ${ck[code] === "NG" ? "selected" : ""}>NG</option>
-                    </select>
+            ${Array.from({ length: recordCount }, (_unusedRecord, recordIdx) => {
+              const base = recordIdx * ROWS_PER_RECORD;
+              const header = rows[base];
+              const datePickVal = header.workDate && /^\d{4}-\d{2}-\d{2}$/.test(header.workDate) ? header.workDate : "";
+              return Array.from({ length: ROWS_PER_RECORD }, (_unusedLine, lineIdx) => {
+                const rowIdx = base + lineIdx;
+                const row = rows[rowIdx];
+                const ck = row.checks;
+                const headerCells = lineIdx === 0 ? `
+                  <td rowspan="${ROWS_PER_RECORD}">${recordIdx + 1}</td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="date-cell">
+                    <div class="date-cell-stack">
+                      <div class="date-cell-wrap">
+                        <input type="text" data-i="${base}" data-k="workDate" value="${header.workDate || ""}" placeholder="----/--/--" maxlength="10" autocomplete="off" />
+                        <label class="work-date-cal-label" title="Calendar" aria-label="Pick date">
+                          <span class="work-date-cal-icon" aria-hidden="true">&#128197;</span>
+                          <input type="date" class="work-date-picker" data-i="${base}" value="${datePickVal}" />
+                        </label>
+                      </div>
+                      <button type="button" class="delete-record-btn" data-delete-record="${recordIdx}">Delete</button>
+                    </div>
                   </td>
-                `).join("")}
-                <td><input style="width:100%;" data-i="${i}" data-k="leaderCheck" value="${r.leaderCheck || ""}"></td>
-                <td><input style="width:100%;" data-i="${i}" data-k="remarks" value="${r.remarks || ""}"></td>
-              </tr>`;
+                  <td rowspan="${ROWS_PER_RECORD}"><input data-i="${base}" data-k="machineNo" value="${header.machineNo || ""}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="startTime" value="${header.startTime || "00:00"}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="finishTime" value="${header.finishTime || "00:00"}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="qty" value="${header.qty}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="okCount" value="${header.okCount}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="ngCount" value="${header.ngCount}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="pic-col"><input data-i="${base}" data-k="pic" value="${header.pic || ""}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="checkbox" data-i="${base}" data-k="sopCheck" ${header.sopCheck ? "checked" : ""} aria-label="SOP Check"></td>
+                ` : "";
+                return `
+                  <tr>
+                    ${headerCells}
+                    ${SHEET_CHECK_CODES.map((code) => `
+                      <td class="check-col ${isCheckValueAlert(ck[code], checkRules[code]) ? "check-alert-cell" : ""}">
+                        ${checkInputModes[code] === "NUMERIC"
+                          ? `<input type="text" inputmode="decimal" data-i="${rowIdx}" data-k="check_${code}" value="${ck[code] || ""}" aria-label="Check ${code} value">`
+                          : `<select data-i="${rowIdx}" data-k="check_${code}" aria-label="Check ${code}">
+                              <option value="" ${ck[code] === "" ? "selected" : ""}></option>
+                              <option value="OK" ${ck[code] === "OK" ? "selected" : ""}>OK</option>
+                              <option value="NG" ${ck[code] === "NG" ? "selected" : ""}>NG</option>
+                            </select>`
+                        }
+                      </td>
+                    `).join("")}
+                    <td><input style="width:100%;" data-i="${rowIdx}" data-k="leaderCheck" value="${row.leaderCheck || ""}"></td>
+                    <td><input style="width:100%;" data-i="${rowIdx}" data-k="remarks" value="${row.remarks || ""}"></td>
+                  </tr>
+                `;
+              }).join("");
             }).join("")}
           </tbody>
         </table></div>`;
@@ -843,18 +1245,33 @@
         const i = Number(el.dataset.i);
         const k = el.dataset.k;
         if (k == null || Number.isNaN(i) || !rows[i]) return;
+        const prevLen = rows.length;
         if (k.startsWith("check_")) {
           ensureRowChecks(rows[i]);
-          rows[i].checks[k.replace("check_", "")] = el.value;
+          const checkCode = k.replace("check_", "");
+          const mode = checkInputModes[checkCode] === "NUMERIC" ? "NUMERIC" : "OKNG";
+          if (mode === "NUMERIC") {
+            rows[i].checks[checkCode] = String(el.value || "").trim().slice(0, 50);
+          } else {
+            rows[i].checks[checkCode] = el.value === "OK" || el.value === "NG" ? el.value : "";
+          }
+          const td = el.closest("td.check-col");
+          if (td) {
+            td.classList.toggle("check-alert-cell", isCheckValueAlert(rows[i].checks[checkCode], checkRules[checkCode]));
+          }
         } else if (k === "workDate") {
           const norm = normalizeWorkDateInput(el.value);
           rows[i][k] = norm;
           if (el.value !== norm) el.value = norm;
           const picker = wrap.querySelector(`input.work-date-picker[data-i="${i}"]`);
           if (picker) picker.value = norm && /^\d{4}-\d{2}-\d{2}$/.test(norm) ? norm : "";
+        } else if (k === "sopCheck") {
+          rows[i][k] = !!el.checked;
         } else {
           rows[i][k] = el.value;
         }
+        ensureTrailingBlankRecord(rows);
+        if (rows.length !== prevLen) renderTable();
       };
 
       wrap.querySelectorAll("input.work-date-picker").forEach((picker) => {
@@ -869,6 +1286,21 @@
         picker.addEventListener("click", (e) => e.stopPropagation());
       });
 
+      wrap.querySelectorAll("button[data-delete-record]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const recordIdx = Number(btn.dataset.deleteRecord);
+          if (Number.isNaN(recordIdx) || recordIdx < 0) return;
+          const start = recordIdx * ROWS_PER_RECORD;
+          if (start < 0 || start >= rows.length) return;
+          rows.splice(start, ROWS_PER_RECORD);
+          if (rows.length === 0) rows.push(...createEmptyRecordRows(1));
+          ensureRecordRows(rows);
+          ensureTrailingBlankRecord(rows);
+          collapseTrailingBlankRecords(rows);
+          renderTable();
+        });
+      });
+
       wrap.querySelectorAll("input,select").forEach((el) => {
         if (el.classList.contains("work-date-picker")) return;
         el.addEventListener("change", () => syncCell(el));
@@ -881,24 +1313,69 @@
     let syncingPartSelects = false;
     function syncPartSelectsFromPartNo(partNo) {
       syncingPartSelects = true;
-      document.getElementById("partNameSelect").value = partNo;
+      document.getElementById("partNameSelect").value = state.partNameLabelByNo[partNo] || state.partNamesByNo[partNo] || partNo || "";
       document.getElementById("partNoSelect").value = partNo;
       syncingPartSelects = false;
     }
 
+    function resolvePartNameInput(raw) {
+      const val = String(raw || "").trim();
+      if (!val) return "";
+      const opts = Array.isArray(state.partNameOptions) ? state.partNameOptions : [];
+      const exact = opts.find((o) => String(o.label).toUpperCase() === val.toUpperCase());
+      if (exact) return exact.partNo;
+      const pref = opts.filter((o) => String(o.label).toUpperCase().startsWith(val.toUpperCase()));
+      if (pref.length === 1) return pref[0].partNo;
+      return "";
+    }
+
+    function normalizePartNoKey(s) {
+      let v = String(s || "").trim();
+      try {
+        v = v.normalize("NFKC");
+      } catch (_e) {
+        /* ignore */
+      }
+      v = v.replace(/[\u200B-\u200D\uFEFF]/g, "");
+      return v.replace(/\s+/g, "").toUpperCase();
+    }
+
+    function resolvePartNoInput(raw) {
+      const val = String(raw || "").trim();
+      if (!val) return "";
+      const opts = Array.isArray(state.partNoOptions) ? state.partNoOptions : [];
+      if (opts.length === 0) return "";
+
+      const valUp = val.toUpperCase();
+      const want = normalizePartNoKey(val);
+
+      const legacyExact = opts.find((o) => String(o).trim().toUpperCase() === valUp);
+      if (legacyExact) return String(legacyExact).trim();
+
+      const normExact = opts.find((o) => normalizePartNoKey(o) === want);
+      if (normExact) return String(normExact).trim();
+
+      const legacyPref = opts.filter((o) => String(o).trim().toUpperCase().startsWith(valUp));
+      if (legacyPref.length === 1) return String(legacyPref[0]).trim();
+
+      const normPref = want ? opts.filter((o) => normalizePartNoKey(o).startsWith(want)) : [];
+      if (normPref.length === 1) return String(normPref[0]).trim();
+
+      return "";
+    }
+
     function fillPartSelects(parts) {
-      const nameSel = document.getElementById("partNameSelect");
-      const noSel = document.getElementById("partNoSelect");
-      nameSel.replaceChildren();
-      noSel.replaceChildren();
-      const phN = document.createElement("option");
-      phN.value = "";
-      phN.textContent = "— Select —";
-      nameSel.appendChild(phN);
-      const phC = document.createElement("option");
-      phC.value = "";
-      phC.textContent = "— Select —";
-      noSel.appendChild(phC);
+      const nameInput = document.getElementById("partNameSelect");
+      const nameDl = document.getElementById("partNameDatalist");
+      const noInput = document.getElementById("partNoSelect");
+      const dl = document.getElementById("partNoDatalist");
+      if (nameInput) nameInput.value = "";
+      nameDl && nameDl.replaceChildren();
+      state.partNoOptions = [];
+      state.partNameOptions = [];
+      state.partNameLabelByNo = {};
+      if (noInput) noInput.value = "";
+      dl && dl.replaceChildren();
       const nameCounts = {};
       for (const p of parts) {
         nameCounts[p.partName] = (nameCounts[p.partName] || 0) + 1;
@@ -907,14 +1384,20 @@
         state.partNamesByNo[p.partNo] = p.partName;
         const nameLabel =
           nameCounts[p.partName] > 1 ? `${p.partName} (${p.partNo})` : p.partName;
-        const on = document.createElement("option");
-        on.value = p.partNo;
-        on.textContent = nameLabel;
-        nameSel.appendChild(on);
-        const oc = document.createElement("option");
-        oc.value = p.partNo;
-        oc.textContent = p.partNo;
-        noSel.appendChild(oc);
+        state.partNameLabelByNo[p.partNo] = nameLabel;
+        state.partNameOptions.push({ label: nameLabel, partNo: p.partNo });
+        if (nameDl) {
+          const n = document.createElement("option");
+          n.value = nameLabel;
+          nameDl.appendChild(n);
+        }
+        state.partNoOptions.push(p.partNo);
+
+        if (dl) {
+          const d = document.createElement("option");
+          d.value = p.partNo;
+          dl.appendChild(d);
+        }
       }
     }
 
@@ -922,6 +1405,8 @@
       const formatId = document.getElementById("format").value;
       state.editingHeaderId = null;
       state.partNamesByNo = {};
+      state.partNameLabelByNo = {};
+      state.partNameOptions = [];
       state.processes = [];
       state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
       state.selectedDrawingIndex = 0;
@@ -983,6 +1468,57 @@
       return "";
     }
 
+    function normProcessName(name) {
+      return String(name || "").trim().toUpperCase();
+    }
+
+    /**
+     * Map saved checksheet_process rows onto the current process_master list.
+     * After master re-import, process_master_id values often change; we then match by snapshot name + display order.
+     */
+    function findSavedProcessForCurrent(p, savedList, usedSavedProcessIds) {
+      const saved = Array.isArray(savedList) ? savedList : [];
+      const used = usedSavedProcessIds instanceof Set ? usedSavedProcessIds : new Set();
+
+      const curMid = p.processMasterId == null || p.processMasterId === "" ? NaN : Number(p.processMasterId);
+      if (Number.isFinite(curMid)) {
+        const byId = saved.find(
+          (sp) =>
+            sp.processId != null &&
+            !used.has(sp.processId) &&
+            sp.processMasterId != null &&
+            sp.processMasterId !== "" &&
+            Number(sp.processMasterId) === curMid
+        );
+        if (byId) return byId;
+      }
+
+      const name = normProcessName(p.processName);
+      const ord = Number(p.displayOrder) || 0;
+      const sameName = saved.filter(
+        (sp) => sp.processId != null && !used.has(sp.processId) && normProcessName(sp.processName) === name
+      );
+      if (sameName.length === 0) return null;
+      const byOrder = sameName.find((sp) => Number(sp.displayOrder) === ord);
+      return byOrder || sameName[0];
+    }
+
+    /** Clear process / reference / grid state so a failed or invalid Load does not keep the previous sheet. */
+    function clearLoadedSheetView(resultMessage) {
+      state.editingHeaderId = null;
+      state.processes = [];
+      state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
+      state.rowsByProcess = {};
+      state.selectedDrawingIndex = 0;
+      state.selectedProcessIndex = 0;
+      renderTabs();
+      updateHeaderProcess();
+      renderReferences();
+      renderTable();
+      const out = document.getElementById("result");
+      if (out && resultMessage != null) out.textContent = resultMessage;
+    }
+
     function applyLoadedChecksheet(detail) {
       document.getElementById("revNo").value = detail.revNo || "";
       if (detail.department) document.getElementById("department").value = detail.department;
@@ -1005,80 +1541,74 @@
       }
 
       state.rowsByProcess = {};
+      const usedSavedProcIds = new Set();
       for (const p of state.processes) {
         const key = p.processMasterId;
-        const savedProc = (detail.processes || []).find((sp) => sp.processMasterId === p.processMasterId);
-        const rows = Array.from({ length: 31 }, (_, i) => defaultRow(i + 1));
+        const savedProc = findSavedProcessForCurrent(p, detail.processes, usedSavedProcIds);
+        if (savedProc && savedProc.processId != null) usedSavedProcIds.add(savedProc.processId);
+        let rows = [];
         if (savedProc && Array.isArray(savedProc.rows)) {
-          for (const sr of savedProc.rows) {
-            const idx = sr.rowNo - 1;
-            if (idx < 0 || idx > 30) continue;
-            const checks = { A: "", B: "", C: "", D: "", E: "", F: "", G: "" };
+          const sortedRows = [...savedProc.rows].sort((a, b) => (a.rowNo || 0) - (b.rowNo || 0));
+          const parsedRows = [];
+          for (const sr of sortedRows) {
+            const checks = EMPTY_CHECKS();
             for (const c of sr.checks || []) {
               if (c && c.checkCode && Object.prototype.hasOwnProperty.call(checks, c.checkCode)) {
                 checks[c.checkCode] = c.result || "";
               }
             }
-            rows[idx] = {
-              rowNo: sr.rowNo,
+            parsedRows.push({
+              rowNo: rows.length + 1,
               workDate: fmtSheetDate(sr.workDate) || "",
               startTime: fmtSheetTime(sr.startTime),
               finishTime: fmtSheetTime(sr.finishTime),
               qty: sr.qty != null ? String(sr.qty) : "",
               okCount: sr.okCount != null ? String(sr.okCount) : "",
               ngCount: sr.ngCount != null ? String(sr.ngCount) : "",
+              machineNo: sr.machineNo || "",
               pic: sr.pic || "",
+              sopCheck: !!sr.sopCheck,
               leaderCheck: sr.leaderCheck || "",
               remarks: sr.remarks || "",
               checks
-            };
+            });
           }
+          rows = normalizeSavedRowsToRecordRows(parsedRows);
         }
+        ensureRecordRows(rows);
+        ensureTrailingBlankRecord(rows);
         state.rowsByProcess[key] = rows;
       }
     }
 
     async function loadSheet() {
       const formatId = document.getElementById("format").value;
-      const partNo = document.getElementById("partNoSelect").value;
+      const partNo = resolvePartNoInput(document.getElementById("partNoSelect").value);
       const effDate = getEffDateIso();
       if (!partNo) {
-        document.getElementById("result").textContent = "Select a part (Part Name or Part No), then press Load.";
+        clearLoadedSheetView(
+          "Select a valid part (Part Name or Part No from the list), then press Load."
+        );
         return;
       }
       if (!effDate) {
-        document.getElementById("result").textContent = "Select Eff date (year and month), then press Load.";
+        clearLoadedSheetView("Select Eff date (year and month), then press Load.");
         return;
       }
       document.getElementById("result").textContent = "Loading…";
-      const [processRes, refRes] = await Promise.all([
+      const monthUrl = `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNo)}&effDate=${encodeURIComponent(effDate)}`;
+      const [processRes, refRes, monthRes] = await Promise.all([
         fetch(`/api/formats/${formatId}/processes?partNo=${encodeURIComponent(partNo)}`),
-        fetch(`/api/references?formatId=${formatId}&partNo=${encodeURIComponent(partNo)}`)
+        fetch(`/api/references?formatId=${formatId}&partNo=${encodeURIComponent(partNo)}`),
+        fetch(monthUrl)
       ]);
-      const processData = await processRes.json();
-      const refData = await refRes.json();
+      const [processData, refData, monthData] = await Promise.all([processRes.json(), refRes.json(), monthRes.json()]);
       if (!processRes.ok) {
-        document.getElementById("result").textContent = processData.message || JSON.stringify(processData);
-        state.editingHeaderId = null;
-        state.processes = [];
-        state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
-        state.rowsByProcess = {};
-        renderTabs();
-        updateHeaderProcess();
-        renderReferences();
-        renderTable();
+        clearLoadedSheetView(processData.message || JSON.stringify(processData));
         return;
       }
       if (!refRes.ok) {
-        document.getElementById("result").textContent = refData.message || JSON.stringify(refData);
-        state.editingHeaderId = null;
-        state.processes = [];
-        state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
-        state.rowsByProcess = {};
-        renderTabs();
-        updateHeaderProcess();
-        renderReferences();
-        renderTable();
+        clearLoadedSheetView(refData.message || JSON.stringify(refData));
         return;
       }
       state.processes = processData;
@@ -1090,22 +1620,18 @@
       updateHeaderProcess();
       renderReferences();
 
-      const monthRes = await fetch(
-        `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNo)}&effDate=${encodeURIComponent(effDate)}`
-      );
       if (monthRes.ok) {
-        const detail = await monthRes.json();
-        applyLoadedChecksheet(detail);
-        state.editingHeaderId = detail.headerId;
-        document.getElementById("result").textContent = `Loaded saved sheet (headerId=${detail.headerId}). Save again to update.`;
+        applyLoadedChecksheet(monthData);
+        state.editingHeaderId = monthData.headerId;
+        document.getElementById("result").textContent = `Loaded saved sheet (headerId=${monthData.headerId}). Save again to update.`;
       } else if (monthRes.status === 404) {
         state.editingHeaderId = null;
         document.getElementById("result").textContent =
           "No saved data for this month and part. Showing master data for new entry. Save will create a new sheet.";
       } else {
         state.editingHeaderId = null;
-        const err = await monthRes.json().catch(() => ({}));
-        document.getElementById("result").textContent = err.message || `for-month status=${monthRes.status}`;
+        document.getElementById("result").textContent =
+          monthData.message || `for-month status=${monthRes.status}`;
       }
 
       renderTable();
@@ -1181,7 +1707,7 @@
         const span = document.createElement("span");
         span.className = "print-field-value";
         const wd = inp.dataset.k === "workDate" && !String(inp.value || "").trim();
-        span.textContent = wd ? "----/--/--" : inp.value || "";
+        span.textContent = t === "checkbox" ? (inp.checked ? "✓" : "") : (wd ? "----/--/--" : inp.value || "");
         span.style.cssText =
           "display:inline-block;width:100%;text-align:center;font:inherit;box-sizing:border-box;min-height:1.15em;border-bottom:1px solid #bbb;padding:1px 2px;";
         inp.replaceWith(span);
@@ -1198,35 +1724,34 @@
       const prevIdx = state.selectedProcessIndex;
       root.replaceChildren();
 
-      for (let i = 0; i < state.processes.length; i++) {
-        state.selectedProcessIndex = i;
-        updateHeaderProcess();
-        renderReferences();
-        renderTable();
-        await new Promise((r) => setTimeout(r, 450));
+      const processIdx = state.selectedProcessIndex;
+      state.selectedProcessIndex = processIdx;
+      updateHeaderProcess();
+      renderReferences();
+      renderTable();
+      await new Promise((r) => setTimeout(r, 450));
 
-        const page = document.createElement("div");
-        page.className = "print-page";
+      const page = document.createElement("div");
+      page.className = "print-page";
 
-        const hs = document.querySelector(".screen-sheet .header-sheet").cloneNode(true);
-        const rw = document.querySelector(".screen-sheet .ref-wrap").cloneNode(true);
-        const tw = document.querySelector(".screen-sheet #tableWrap").cloneNode(true);
-        const fs = document.querySelector(".screen-sheet .footer-sheet").cloneNode(true);
+      const hs = document.querySelector(".screen-sheet .header-sheet").cloneNode(true);
+      const rw = document.querySelector(".screen-sheet .ref-wrap").cloneNode(true);
+      const tw = document.querySelector(".screen-sheet #tableWrap").cloneNode(true);
+      const fs = document.querySelector(".screen-sheet .footer-sheet").cloneNode(true);
 
-        syncPrintClonesFromLive(hs, fs);
-        [hs, rw, tw, fs].forEach(stripAllIds);
-        tw.classList.add("print-table-area");
+      syncPrintClonesFromLive(hs, fs);
+      [hs, rw, tw, fs].forEach(stripAllIds);
+      tw.classList.add("print-table-area");
 
-        const block = document.createElement("div");
-        block.className = "print-process-block";
-        block.appendChild(hs);
-        block.appendChild(rw);
-        block.appendChild(tw);
-        block.appendChild(fs);
-        materializeFormControlsForPrint(block);
-        page.appendChild(block);
-        root.appendChild(page);
-      }
+      const block = document.createElement("div");
+      block.className = "print-process-block";
+      block.appendChild(hs);
+      block.appendChild(rw);
+      block.appendChild(tw);
+      block.appendChild(fs);
+      materializeFormControlsForPrint(block);
+      page.appendChild(block);
+      root.appendChild(page);
 
       state.selectedProcessIndex = prevIdx;
       updateHeaderProcess();
@@ -1238,14 +1763,15 @@
         window.removeEventListener("afterprint", onAfterPrint);
       };
       window.addEventListener("afterprint", onAfterPrint);
+      const selectedProcessName = (state.processes[state.selectedProcessIndex] && state.processes[state.selectedProcessIndex].processName) || "-";
       document.getElementById("result").textContent =
-        "In the print dialog, choose Save as PDF or Microsoft Print to PDF. Each process prints all detail rows and inputs (long processes may span multiple pages).";
+        `In the print dialog, choose Save as PDF or Microsoft Print to PDF. Current process only: ${selectedProcessName} (long rows may span multiple pages).`;
       window.print();
     }
 
     async function saveSheet() {
       const formatId = Number(document.getElementById("format").value);
-      const partNo = document.getElementById("partNoSelect").value;
+      const partNo = resolvePartNoInput(document.getElementById("partNoSelect").value);
       const partName = state.partNamesByNo[partNo] || partNo;
       if (!partNo) {
         document.getElementById("result").textContent = "Select a part and use Load on the Eff date row to load master (or an existing sheet) before saving.";
@@ -1271,7 +1797,18 @@
         footerRemarks2: document.getElementById("footerRemarks2").value || null,
         footerRemarks3: document.getElementById("footerRemarks3").value || null,
         processes: state.processes.map(p => {
-          const rows = (state.rowsByProcess[p.processMasterId] || []).filter((r) => rowHasSheetData(r));
+          const srcRows = state.rowsByProcess[p.processMasterId] || [];
+          const rows = [];
+          for (let i = 0; i < srcRows.length; i += ROWS_PER_RECORD) {
+            const recordRows = srcRows.slice(i, i + ROWS_PER_RECORD);
+            if (!recordRows.length) continue;
+            const hasDataInRecord = recordRows.some((r) => rowHasSheetData(r));
+            if (!hasDataInRecord) continue;
+            for (const r of recordRows) {
+              if (!r) continue;
+              rows.push(r);
+            }
+          }
           return {
             processMasterId: p.processMasterId,
             processName: p.processName,
@@ -1284,12 +1821,15 @@
               qty: toNum(r.qty),
               okCount: toNum(r.okCount),
               ngCount: toNum(r.ngCount),
+              machineNo: r.machineNo || null,
               pic: r.pic || null,
+              sopCheck: !!r.sopCheck,
               leaderCheck: r.leaderCheck || null,
               remarks: r.remarks || null,
-              checks: ["A","B","C","D","E","F","G"]
-                .filter(code => r.checks[code])
-                .map(code => ({ checkCode: code, result: r.checks[code] }))
+              checks: SHEET_CHECK_CODES.filter((code) => r.checks[code]).map((code) => ({
+                checkCode: code,
+                result: r.checks[code]
+              }))
             }))
           };
         })
@@ -1313,6 +1853,28 @@
       } catch (_e) {}
     }
 
+    function flashButtonPress(btn) {
+      if (!btn) return;
+      btn.classList.add("pressed-flash");
+      setTimeout(() => btn.classList.remove("pressed-flash"), 260);
+    }
+
+    async function runActionWithButtonFeedback(buttonId, action) {
+      const btn = document.getElementById(buttonId);
+      if (!btn || btn.dataset.busy === "1") return;
+      btn.dataset.busy = "1";
+      btn.classList.add("busy");
+      flashButtonPress(btn);
+      btn.disabled = true;
+      try {
+        await action();
+      } finally {
+        btn.dataset.busy = "0";
+        btn.disabled = false;
+        btn.classList.remove("busy");
+      }
+    }
+
     document.getElementById("format").onchange = loadPartOptions;
     document.getElementById("partNameSelect").onchange = () => {
       if (syncingPartSelects) return;
@@ -1320,24 +1882,106 @@
       if (state.references) state.references.customerAbbrev = null;
       const hel = document.getElementById("headerCustomerAbbrev");
       if (hel) hel.textContent = "";
-      syncPartSelectsFromPartNo(document.getElementById("partNameSelect").value);
+      const partNo = resolvePartNameInput(document.getElementById("partNameSelect").value);
+      if (!partNo) return;
+      syncPartSelectsFromPartNo(partNo);
     };
-    document.getElementById("partNoSelect").onchange = () => {
+    const partNameInputEl = document.getElementById("partNameSelect");
+    partNameInputEl.addEventListener("blur", () => {
+      partNameInputEl.dispatchEvent(new Event("change"));
+    });
+    partNameInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        partNameInputEl.dispatchEvent(new Event("change"));
+      }
+    });
+
+    const partNoInputEl = document.getElementById("partNoSelect");
+    partNoInputEl.onchange = () => {
       if (syncingPartSelects) return;
       state.editingHeaderId = null;
       if (state.references) state.references.customerAbbrev = null;
       const hel = document.getElementById("headerCustomerAbbrev");
       if (hel) hel.textContent = "";
-      syncPartSelectsFromPartNo(document.getElementById("partNoSelect").value);
+      const resolved = resolvePartNoInput(partNoInputEl.value);
+      if (!resolved) return;
+      syncPartSelectsFromPartNo(resolved);
     };
-    document.getElementById("loadSheetBtn").onclick = () => loadSheet();
-    document.getElementById("saveBtn").onclick = saveSheet;
+    partNoInputEl.addEventListener("blur", () => {
+      partNoInputEl.dispatchEvent(new Event("change"));
+    });
+    partNoInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        partNoInputEl.dispatchEvent(new Event("change"));
+      }
+    });
+    document.getElementById("loadSheetBtn").onclick = () => {
+      runActionWithButtonFeedback("loadSheetBtn", loadSheet);
+    };
+    document.getElementById("saveBtn").onclick = () => {
+      runActionWithButtonFeedback("saveBtn", saveSheet);
+    };
     document.getElementById("savePdfBtn").onclick = () => {
-      saveAsPdf().catch((e) => {
+      runActionWithButtonFeedback("savePdfBtn", saveAsPdf).catch((e) => {
         document.getElementById("result").textContent = String(e && e.message ? e.message : e);
       });
     };
-    loadFormats().then(loadPartOptions);
+
+    async function initFromQueryThenLoad() {
+      const params = new URLSearchParams(window.location.search);
+      const qFmt = params.get("formatId");
+      const qPart = params.get("partNo");
+      const qYear = params.get("effYear");
+      const qMonth = params.get("effMonth");
+      const qLoad = params.get("load") === "1";
+      const qProcessName = params.get("processName") || params.get("process");
+
+      await loadFormats();
+      if (qFmt) {
+        const fmtSel = document.getElementById("format");
+        const exists = [...fmtSel.options].some((o) => String(o.value) === String(qFmt));
+        if (exists) fmtSel.value = String(qFmt);
+      }
+      await loadPartOptions();
+
+      if (qPart) {
+        const want = String(qPart).trim();
+        const resolved = resolvePartNoInput(want);
+        if (resolved) syncPartSelectsFromPartNo(resolved);
+        else document.getElementById("partNoSelect").value = want;
+      }
+      if (qYear) {
+        const yEl = document.getElementById("effYear");
+        if ([...yEl.options].some((o) => o.value === String(qYear))) yEl.value = String(qYear);
+      }
+      if (qMonth) {
+        const mEl = document.getElementById("effMonth");
+        const m2 = String(qMonth).trim().padStart(2, "0");
+        if ([...mEl.options].some((o) => o.value === m2)) mEl.value = m2;
+      }
+
+      if (qLoad && resolvePartNoInput(document.getElementById("partNoSelect").value)) {
+        await loadSheet();
+      }
+
+      if (qProcessName && state.processes && state.processes.length) {
+        const want = String(qProcessName).trim();
+        const idx = state.processes.findIndex(
+          (p) => String(p.processName || "").trim().toUpperCase() === want.toUpperCase()
+        );
+        if (idx >= 0) {
+          state.selectedProcessIndex = idx;
+          state.selectedDrawingIndex = 0;
+          renderTabs();
+          updateHeaderProcess();
+          renderReferences();
+          renderTable();
+        }
+      }
+    }
+    initFromQueryThenLoad();
   </script>
 </body>
 </html>

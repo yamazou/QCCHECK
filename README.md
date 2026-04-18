@@ -17,6 +17,11 @@ Starter kit to move Excel-style check sheet entry to the web.
 6. For existing DBs, run `sql/07_add_footer_fields.sql` (footer remarks / approval fields)
 7. For existing DBs, run `sql/08_add_footer_remarks_3rows.sql` (three footer remark rows)
 8. Run `sql/15_part_customer.sql` (customer abbreviation per part for the sheet header)
+9. For existing DBs, run `sql/22_expand_checksheet_row_no.sql` (allow detail rows beyond 31 when many records are entered)
+10. If duplicate monthly sheets already exist, run `sql/23_cleanup_duplicate_checksheet_headers.sql` (keep newest header per format+part+effDate)
+11. To enable numeric input by check point, run `sql/24_add_pointcheck_input_mode_and_flexible_result.sql`
+12. To store point-check thresholds as min/max values, run `sql/25_add_pointcheck_criteria_range.sql`
+13. To add Machine No / SOP Check fields on checksheet rows, run `sql/26_add_machine_no_and_sop_check.sql`
 
 ## 2) Start the API
 ```bash

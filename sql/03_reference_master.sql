@@ -8,7 +8,7 @@ BEGIN
         format_id INT NOT NULL,
         part_no NVARCHAR(100) NOT NULL,
         process_code NVARCHAR(50) NULL,
-        drawing_no NVARCHAR(100) NOT NULL,
+        drawing_no NVARCHAR(100) NULL,
         drawing_name NVARCHAR(200) NULL,
         file_url NVARCHAR(500) NULL,
         note NVARCHAR(500) NULL,
@@ -31,13 +31,18 @@ BEGIN
         check_code NCHAR(1) NOT NULL,
         check_point NVARCHAR(300) NOT NULL,
         criteria NVARCHAR(300) NULL,
+        criteria_min DECIMAL(18,4) NULL,
+        criteria_max DECIMAL(18,4) NULL,
         check_method NVARCHAR(300) NULL,
         note NVARCHAR(500) NULL,
+        input_mode VARCHAR(20) NOT NULL DEFAULT 'OKNG',
         active_flag BIT NOT NULL DEFAULT 1,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_pcr_format FOREIGN KEY (format_id) REFERENCES dbo.format_master(format_id),
-        CONSTRAINT CK_pcr_code CHECK (check_code IN ('A','B','C','D','E','F','G'))
+        CONSTRAINT CK_pcr_code CHECK (check_code IN ('A','B','C','D','E','F','G')),
+        CONSTRAINT CK_pcr_input_mode CHECK (input_mode IN ('OKNG', 'NUMERIC')),
+        CONSTRAINT CK_pcr_criteria_range CHECK (criteria_min IS NULL OR criteria_max IS NULL OR criteria_min <= criteria_max)
     );
     CREATE INDEX IX_pcr_lookup ON dbo.point_check_reference(format_id, part_no, active_flag);
 END

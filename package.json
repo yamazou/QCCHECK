@@ -3,6 +3,11 @@
   "private": true,
   "scripts": {
     "start": "npm start --prefix server",
-    "dev": "npm run dev --prefix server"
+    "dev": "npm run dev --prefix server",
+    "import:part-master": "node scripts/import_part_master_from_excel.js",
+    "import:part-customer": "node scripts/import_part_customer_from_excel.js",
+    "import:process-master": "node scripts/import_process_master_from_excel.js",
+    "import:point-check-reference": "node scripts/import_point_check_reference_from_excel.js",
+    "import:drawing-reference": "node scripts/import_drawing_reference_from_excel.js"
   }
 }

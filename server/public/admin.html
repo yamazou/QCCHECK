@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QC Check — Master data</title>
+  <title>QC Check — Master Data</title>
   <style>
     :root {
       --bg: #f4f7fb;
@@ -55,11 +55,202 @@
       color: #fff;
       border-radius: 8px;
       font-weight: 600;
+      transition: transform 0.08s ease, box-shadow 0.12s ease, opacity 0.15s ease;
     }
+    button:active { transform: translateY(1px) scale(0.985); }
     button:hover { background: linear-gradient(180deg, #0f6de2, #0958c3); }
+    button.busy {
+      opacity: 0.88;
+      cursor: wait;
+      pointer-events: none;
+      box-shadow: 0 0 0 2px rgba(11, 99, 216, 0.2);
+    }
+    button.pressed-flash {
+      box-shadow: 0 0 0 3px rgba(11, 99, 216, 0.28);
+    }
+    input:disabled, select:disabled, textarea:disabled, button:disabled {
+      background: #eef1f6;
+      color: #7b879b;
+      border-color: #cfd7e6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:disabled {
+      background: #b8c3d6;
+      border-color: #aab6cc;
+    }
     table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; background: #fff; }
     th, td { border: 1px solid #d5deec; padding: 6px 8px; text-align: left; }
     th { background: #ecf2fd; color: #2d3d5a; }
+    #detailPanel table th,
+    #detailPanel table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    #detailPanel table input:not([type="checkbox"]):not([type="file"]),
+    #detailPanel table select {
+      text-align: center;
+    }
+    #drawTable {
+      table-layout: fixed;
+      width: 100%;
+    }
+    #drawTable th:nth-child(2),
+    #drawTable td:nth-child(2) {
+      width: 100px;
+    }
+    #drawTable th:nth-child(3),
+    #drawTable td:nth-child(3) {
+      width: 12%;
+    }
+    #drawTable th:nth-child(4),
+    #drawTable td:nth-child(4) {
+      width: auto;
+      min-width: 0;
+    }
+    #drawTable th:nth-child(5),
+    #drawTable td:nth-child(5) {
+      width: 56px;
+    }
+    #drawTable th:nth-child(6),
+    #drawTable td:nth-child(6) {
+      width: 200px;
+    }
+    #detailPanel #drawTable input.durl {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      text-align: left;
+    }
+    #detailPanel input.dr-url-add {
+      width: 100%;
+      min-width: 160px;
+      box-sizing: border-box;
+      text-align: left;
+    }
+    #drawTable th:first-child,
+    #drawTable td:first-child {
+      width: 22%;
+      min-width: 160px;
+      max-width: 320px;
+      vertical-align: middle;
+    }
+    #drawTable select.dproc {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      height: 28px;
+      padding: 3px 6px;
+      font-size: 13px;
+    }
+    #pcTable th, #pcTable td {
+      text-align: center;
+      padding: 3px 5px;
+      vertical-align: middle;
+      line-height: 1.15;
+    }
+    #pcTable input, #pcTable select {
+      text-align: center;
+      height: 26px;
+      padding: 2px 4px;
+      box-sizing: border-box;
+      line-height: 1.15;
+    }
+    #pcTable th:first-child,
+    #pcTable td:first-child {
+      min-width: 188px;
+      max-width: 220px;
+    }
+    #pcTable select.pcproc {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      height: 28px;
+      padding: 3px 6px;
+      font-size: 13px;
+    }
+    #pcTable input.pctext {
+      width: 100%;
+      max-width: 118px;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #pcTable input.pcmin,
+    #pcTable input.pcmax {
+      width: 100%;
+      max-width: 58px;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #pcTable th:nth-child(3),
+    #pcTable td:nth-child(3) {
+      max-width: 124px;
+    }
+    #pcTable th:nth-child(5),
+    #pcTable td:nth-child(5),
+    #pcTable th:nth-child(6),
+    #pcTable td:nth-child(6) {
+      max-width: 64px;
+    }
+    /* Point checks: alternate background by Process group (sorted order). */
+    #pcTable tbody tr.pc-row-proc-a > td {
+      background-color: #fff;
+    }
+    #pcTable tbody tr.pc-row-proc-b > td {
+      background-color: rgb(234, 243, 228);
+    }
+    #pcTable tbody tr.pc-row-proc-b > td input:not([type="checkbox"]),
+    #pcTable tbody tr.pc-row-proc-b > td select {
+      background-color: #fff;
+      border-color: #c5d4bc;
+    }
+    #detailPanel table td.row-actions {
+      white-space: nowrap;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    #detailPanel table td.row-actions button {
+      padding: 6px 12px;
+      font-size: 13px;
+      line-height: 1.25;
+      min-height: 32px;
+      box-sizing: border-box;
+    }
+    #detailPanel table td.row-actions button + button {
+      margin-left: 6px;
+    }
+    #detailPanel input.pc-text-narrow {
+      width: 118px;
+      max-width: 118px;
+      height: 26px;
+      padding: 2px 4px;
+      box-sizing: border-box;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #detailPanel input.pc-num-narrow {
+      width: 58px;
+      max-width: 58px;
+      height: 26px;
+      padding: 2px 4px;
+      box-sizing: border-box;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .muted { color: var(--muted); font-size: 12px; }
     .panel {
       border: 1px solid var(--line);
@@ -70,6 +261,19 @@
       box-shadow: 0 3px 12px rgba(20, 46, 89, 0.05);
     }
     .panel h2 { margin: 0 0 10px; font-size: 16px; }
+    .parts-search-panel {
+      border: 3px solid #1e3d66;
+      box-shadow: 0 0 0 1px rgba(30, 61, 102, 0.12);
+    }
+    .parts-search-panel h2 {
+      font-weight: 800;
+      font-size: 17px;
+      color: #142a46;
+    }
+    .parts-search-panel label {
+      font-weight: 700;
+      color: #1a3050;
+    }
     .err { color: #b00; font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
     .ok { color: #060; font-size: 13px; margin-top: 8px; }
     .btn-del { background: linear-gradient(180deg, #d95c5c, #bf3f3f); border-color: #9d2f2f; color: #fff; }
@@ -118,19 +322,25 @@
         <div class="brand-left">
           <img src="/assets/q-finder-logo.png" alt="Q-Finder" class="brand-logo" />
           <div>
-            <h1>Master Data Management</h1>
+            <h1>Master Data</h1>
           </div>
         </div>
-        <p class="sub">Open from <a href="/">QC Check Entry</a></p>
+        <p class="sub">
+          <a href="/">QC Check</a>
+          <span aria-hidden="true"> · </span>
+          <a href="/daily-check-history.html">Monthly History</a>
+          <span aria-hidden="true"> · </span>
+          <strong>Master Data</strong>
+        </p>
       </div>
     </div>
     <div class="toolbar">
       <div class="row" style="margin-bottom:0;">
         <div>
           <label for="formatSel">Format</label>
-          <select id="formatSel"></select>
+          <select id="formatSel" disabled></select>
         </div>
-        <button type="button" id="reloadCatalog">Reload catalog</button>
+        <button type="button" id="reloadCatalog" disabled title="Catalog loads automatically for the selected format.">Reload catalog</button>
       </div>
       <div id="catalogMsg" class="err" style="display:none;"></div>
     </div>
@@ -138,31 +348,32 @@
   <div class="panel" style="margin-top:0;">
     <h2>Check Sheet header master</h2>
     <div class="row">
-      <div><label>Company name</label><input id="brandCompany" placeholder="e.g. PT YAN JIN INDONESIA" style="width:320px;" maxlength="200" /></div>
-      <div><label>Department name</label><input id="brandDept" placeholder="e.g. Production Department" style="width:260px;" maxlength="200" /></div>
-      <div><label>Logo URL</label><input id="brandLogo" placeholder="e.g. /drawings/UACJ_logo.png" style="width:320px;" maxlength="500" /></div>
+      <div><label>Company name</label><input id="brandCompany" placeholder="e.g. PT YAN JIN INDONESIA" style="width:320px;" maxlength="200" disabled /></div>
+      <div><label>Department name</label><input id="brandDept" placeholder="e.g. Production Department" style="width:260px;" maxlength="200" disabled /></div>
+      <div><label>Logo URL</label><input id="brandLogo" placeholder="e.g. /drawings/UACJ_logo.png" style="width:320px;" maxlength="500" disabled /></div>
       <div>
         <label>Logo file</label>
         <div class="file-pick">
-          <input id="brandLogoFile" class="visually-hidden" type="file" accept="image/*" />
-          <button type="button" id="pickBrandLogoFile">Choose file</button>
+          <input id="brandLogoFile" class="visually-hidden" type="file" accept="image/*" disabled />
+          <button type="button" id="pickBrandLogoFile" disabled>Choose file</button>
           <span id="brandLogoFileName" class="file-name">No file chosen</span>
         </div>
       </div>
-      <button type="button" id="btnUploadBrandLogo">Upload logo</button>
-      <button type="button" id="btnSaveBranding">Save header master</button>
+      <button type="button" id="btnUploadBrandLogo" disabled>Upload logo</button>
+      <button type="button" id="btnSaveBranding" disabled>Save header master</button>
     </div>
     <div id="brandingMsg" class="err" style="display:none;"></div>
     <div id="brandingOk" class="ok" style="display:none;"></div>
   </div>
 
   <div class="grid2">
-    <div class="panel">
-      <h2>Registered parts</h2>
+    <div class="panel parts-search-panel">
+      <h2>Parts</h2>
       <div class="row">
         <div style="min-width:360px;">
-          <label for="partsSelect">Part</label>
-          <select id="partsSelect" style="width:100%;"></select>
+          <label for="partsSelect">Part No</label>
+          <input id="partsSelect" list="partsNoDatalist" autocomplete="off" style="width:100%;" />
+          <datalist id="partsNoDatalist"></datalist>
         </div>
         <button type="button" id="btnOpenPart">Open</button>
         <button type="button" id="btnDeletePart" class="btn-del">Delete</button>
@@ -201,16 +412,16 @@
     </div>
 
     <h3 style="margin-top:20px;">Drawings</h3>
-    <p class="muted">Blank <code>processCode</code> = part-wide. URL example: <code>/drawings/xxx.png</code></p>
+    <p class="muted">URL example: <code>/drawings/xxx.png</code></p>
     <table id="drawTable">
       <thead><tr><th>Process</th><th>Drawing No</th><th>Name</th><th>fileUrl</th><th>Active</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row" style="margin-top:8px;">
-      <div><label>Process (blank = common)</label><select id="drProc" style="width:140px;"><option value="" selected>(common)</option></select></div>
+      <div><label>Process</label><select id="drProc" style="width:140px;"></select></div>
       <div><label>drawingNo</label><input id="drNo" style="width:120px;" /></div>
       <div><label>drawingName</label><input id="drName" style="width:180px;" /></div>
-      <div><label>fileUrl</label><input id="drUrl" style="width:220px;" /></div>
+      <div style="flex:1;min-width:220px;"><label>fileUrl</label><input id="drUrl" class="dr-url-add" /></div>
       <div>
         <label>Drawing image</label>
         <div class="file-pick">
@@ -225,15 +436,18 @@
 
     <h3 style="margin-top:20px;">Point checks</h3>
     <table id="pcTable">
-      <thead><tr><th>Process</th><th>Code</th><th>Text</th><th>Criteria</th><th>Method</th><th>Active</th><th></th></tr></thead>
+      <thead><tr><th style="min-width:188px;max-width:220px;">Process</th><th>Code</th><th style="max-width:124px;">Text</th><th>Criteria</th><th style="max-width:64px;">Min</th><th style="max-width:64px;">Max</th><th>Method</th><th>Input</th><th>Active</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="row" style="margin-top:8px;">
-      <div><label>Process (blank = common)</label><select id="pcProc" style="width:140px;"><option value="" selected>(common)</option></select></div>
-      <div><label>Code A–G</label><select id="pcCode" style="width:60px;"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
-      <div><label>Text</label><input id="pcText" style="width:200px;" /></div>
+      <div><label>Process</label><select id="pcProc" style="width:200px;min-width:140px;max-width:220px;"></select></div>
+      <div><label>Code A–M</label><select id="pcCode" style="width:60px;"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>H</option><option>I</option><option>J</option><option>K</option><option>L</option><option>M</option></select></div>
+      <div><label>Text</label><input id="pcText" class="pc-text-narrow" /></div>
       <div><label>Criteria</label><input id="pcCrit" style="width:140px;" /></div>
+      <div><label>Min</label><input id="pcMin" class="pc-num-narrow" inputmode="decimal" /></div>
+      <div><label>Max</label><input id="pcMax" class="pc-num-narrow" inputmode="decimal" /></div>
       <div><label>Method</label><input id="pcMethod" style="width:120px;" /></div>
+      <div><label>Input</label><select id="pcInputMode" style="width:110px;"><option value="OKNG">OK/NG</option><option value="NUMERIC">Numeric</option></select></div>
       <button type="button" id="btnAddPc">Add</button>
     </div>
   </div>
@@ -250,11 +464,99 @@
     let formatId = null;
     let selectedPart = null;
     let catalogParts = [];
+    let partNoOptions = [];
+
+    function formatRegisteredPartLabel(p) {
+      if (!p || !p.partNo) return "";
+      const pn = String(p.partNo).trim();
+      const nameRaw = String(p.partName || "").trim();
+      const n = Array.isArray(p.processes) ? p.processes.length : 0;
+      const distinct = nameRaw && nameRaw.toUpperCase() !== pn.toUpperCase();
+      if (distinct) return `${pn} - ${nameRaw} (${n})`;
+      return `${pn} (${n})`;
+    }
+
+    /** Datalist only: `value` is already part no — label must not repeat part no (browser shows value + label). */
+    function formatCatalogDatalistLabel(p) {
+      if (!p || !p.partNo) return "";
+      const pn = String(p.partNo).trim();
+      const nameRaw = String(p.partName || "").trim();
+      const n = Array.isArray(p.processes) ? p.processes.length : 0;
+      const distinct = nameRaw && nameRaw.toUpperCase() !== pn.toUpperCase();
+      if (distinct) return `${nameRaw} (${n})`;
+      return `(${n})`;
+    }
+
+    function resolvePartNoInput(raw) {
+      const val = String(raw || "").trim();
+      if (!val) return "";
+      const opts = Array.isArray(partNoOptions) ? partNoOptions : [];
+      const upper = val.toUpperCase();
+      const exact = opts.find((o) => String(o).toUpperCase() === upper);
+      if (exact) return exact;
+      const byFullLabel = catalogParts.find((p) => formatRegisteredPartLabel(p).toUpperCase() === upper);
+      if (byFullLabel) return byFullLabel.partNo;
+      const pref = opts.filter((o) => String(o).toUpperCase().startsWith(upper));
+      if (pref.length === 1) return pref[0];
+      const prefLabel = catalogParts.filter((p) => formatRegisteredPartLabel(p).toUpperCase().startsWith(upper));
+      if (prefLabel.length === 1) return prefLabel[0].partNo;
+      return "";
+    }
 
     function showErr(elId, msg) {
       const el = document.getElementById(elId);
       el.style.display = msg ? "block" : "none";
       el.textContent = msg || "";
+    }
+
+    /** Empty process / drawing / point-check tables (e.g. after part-detail API failure). */
+    function emptyAdminDetailTables() {
+      document.getElementById("editCustomerAbbrev").value = "";
+      document.getElementById("drProc").innerHTML = buildProcessOptionsHtml("", false);
+      document.getElementById("pcProc").innerHTML = buildProcessOptionsHtml("", false);
+      const pt = document.querySelector("#procTable tbody");
+      const dt = document.querySelector("#drawTable tbody");
+      const pct = document.querySelector("#pcTable tbody");
+      if (pt) pt.innerHTML = "";
+      if (dt) dt.innerHTML = "";
+      if (pct) pct.innerHTML = "";
+    }
+
+    /** Close part master panel and clear selection so a bad Open does not leave the previous part visible. */
+    function resetMasterDetailClosed(catalogErrMsg) {
+      selectedPart = null;
+      const panel = document.getElementById("detailPanel");
+      if (panel) panel.style.display = "none";
+      const label = document.getElementById("detailPartLabel");
+      if (label) label.textContent = "";
+      const nameEl = document.getElementById("editPartName");
+      if (nameEl) nameEl.value = "";
+      showErr("detailMsg", "");
+      const okEl = document.getElementById("detailOk");
+      if (okEl) okEl.style.display = "none";
+      if (catalogErrMsg !== undefined) showErr("catalogMsg", catalogErrMsg);
+    }
+
+    function flashButtonPress(btn) {
+      if (!btn) return;
+      btn.classList.add("pressed-flash");
+      setTimeout(() => btn.classList.remove("pressed-flash"), 260);
+    }
+
+    async function runActionWithButtonFeedback(buttonOrId, action) {
+      const btn = typeof buttonOrId === "string" ? document.getElementById(buttonOrId) : buttonOrId;
+      if (!btn || btn.dataset.busy === "1") return;
+      btn.dataset.busy = "1";
+      btn.classList.add("busy");
+      flashButtonPress(btn);
+      btn.disabled = true;
+      try {
+        await action();
+      } finally {
+        btn.dataset.busy = "0";
+        btn.disabled = btn.id === "reloadCatalog";
+        btn.classList.remove("busy");
+      }
     }
 
     async function loadFormats() {
@@ -278,20 +580,34 @@
         return;
       }
       catalogParts = data.parts || [];
-      const partsSel = document.getElementById("partsSelect");
-      partsSel.innerHTML = catalogParts.map(p => `
-        <option value="${escapeHtml(p.partNo)}">${escapeHtml(p.partNo)} - ${escapeHtml(p.partName)} (${p.processes ? p.processes.length : 0})</option>
-      `).join("");
+      partNoOptions = catalogParts.map((p) => p.partNo);
+      const partsInput = document.getElementById("partsSelect");
+      const dl = document.getElementById("partsNoDatalist");
+      if (dl) {
+        dl.replaceChildren();
+        for (const p of catalogParts) {
+          const d = document.createElement("option");
+          d.value = p.partNo;
+          d.label = formatCatalogDatalistLabel(p);
+          dl.appendChild(d);
+        }
+      }
 
       if (!catalogParts.length) {
         selectedPart = null;
+        if (partsInput) partsInput.value = "";
         updatePartsSummary();
         return;
       }
 
-      const hasCurrent = catalogParts.some(p => p.partNo === selectedPart);
-      selectedPart = hasCurrent ? selectedPart : catalogParts[0].partNo;
-      partsSel.value = selectedPart;
+      const hasCurrent = selectedPart && catalogParts.some((p) => p.partNo === selectedPart);
+      if (hasCurrent && partsInput) {
+        const cur = catalogParts.find((p) => p.partNo === selectedPart);
+        partsInput.value = cur ? formatRegisteredPartLabel(cur) : selectedPart;
+      } else {
+        selectedPart = null;
+        if (partsInput) partsInput.value = "";
+      }
       updatePartsSummary();
     }
 
@@ -314,32 +630,80 @@
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
+    /**
+     * Point checks: same process order as the Processes table (catalog / display_order),
+     * then check code A–M. Unknown process names sort after known processes; common (no process) last.
+     */
+    function sortPointChecksForAdmin(pointChecks, procsInOrder) {
+      const orderIdx = new Map();
+      let i = 0;
+      for (const pr of procsInOrder || []) {
+        const nm = String(pr.processName || "").trim().toUpperCase();
+        if (!nm || orderIdx.has(nm)) continue;
+        orderIdx.set(nm, i++);
+      }
+      const procKey = (pc) => {
+        const c = pc.processCode == null ? "" : String(pc.processCode).trim();
+        if (!c) return { group: 2, ord: 0, name: "" };
+        const up = c.toUpperCase();
+        if (orderIdx.has(up)) return { group: 0, ord: orderIdx.get(up), name: up };
+        return { group: 1, ord: 0, name: up };
+      };
+      const codeRank = (pc) => {
+        const x = String(pc.checkCode == null ? "" : pc.checkCode).trim().toUpperCase();
+        if (x.length === 1 && x >= "A" && x <= "M") return x.charCodeAt(0);
+        return 200 + (x ? x.charCodeAt(0) : 0);
+      };
+      const list = Array.isArray(pointChecks) ? [...pointChecks] : [];
+      list.sort((a, b) => {
+        const ka = procKey(a);
+        const kb = procKey(b);
+        if (ka.group !== kb.group) return ka.group - kb.group;
+        if (ka.group === 0 && kb.group === 0 && ka.ord !== kb.ord) return ka.ord - kb.ord;
+        if (ka.name !== kb.name) return ka.name.localeCompare(kb.name);
+        return codeRank(a) - codeRank(b);
+      });
+      return list;
+    }
+
     function getCurrentPartProcesses() {
       const p = catalogParts.find(x => x.partNo === selectedPart);
       return p && Array.isArray(p.processes) ? p.processes : [];
     }
 
-    function buildProcessOptionsHtml(currentValue) {
-      const value = currentValue == null ? "" : String(currentValue);
+    function buildProcessOptionsHtml(currentValue, allowBlankCurrent = false) {
+      const value = currentValue == null ? "" : String(currentValue).trim();
       const procs = getCurrentPartProcesses();
       const seen = new Set();
       const options = [];
-      options.push(`<option value="" ${value ? "" : "selected"}>(common)</option>`);
+      if (allowBlankCurrent && !value) {
+        options.push(`<option value="" selected>(common)</option>`);
+      }
+      let selectedAssigned = !value && allowBlankCurrent;
       for (const pr of procs) {
         const processName = String(pr.processName || "").trim();
         if (!processName || seen.has(processName)) continue;
         seen.add(processName);
         const label = pr.activeFlag ? processName : `${processName} (inactive)`;
-        options.push(`<option value="${escapeHtml(processName)}" ${processName === value ? "selected" : ""}>${escapeHtml(label)}</option>`);
+        const selected = value ? (processName === value) : !selectedAssigned;
+        if (selected) selectedAssigned = true;
+        options.push(`<option value="${escapeHtml(processName)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`);
       }
       if (value && !seen.has(value)) {
         options.push(`<option value="${escapeHtml(value)}" selected>${escapeHtml(value)} (unregistered)</option>`);
+      }
+      if (!options.length) {
+        options.push(`<option value="" selected disabled>(no process)</option>`);
       }
       return options.join("");
     }
 
     function renderProcessSelect(className, currentValue, widthPx) {
-      return `<select class="${className}" style="width:${widthPx}px;">${buildProcessOptionsHtml(currentValue)}</select>`;
+      const fillCell = widthPx === "100%" || widthPx === "full";
+      const style = fillCell
+        ? "width:100%;max-width:100%;min-width:0;box-sizing:border-box;"
+        : `width:${Number(widthPx)}px;box-sizing:border-box;`;
+      return `<select class="${className}" style="${style}">${buildProcessOptionsHtml(currentValue, true)}</select>`;
     }
 
     async function uploadImageFile(type, file, errElId) {
@@ -382,12 +746,20 @@
     }
 
     async function openPart(partNo) {
+      const pOpen = catalogParts.find((x) => x.partNo === partNo);
+      if (!partNo || !pOpen) {
+        resetMasterDetailClosed(
+          "Select a valid part (exact part no or a unique match from the list), then Open."
+        );
+        return;
+      }
       selectedPart = partNo;
-      const partsSel = document.getElementById("partsSelect");
-      if (partsSel) partsSel.value = partNo;
+      const partsInput = document.getElementById("partsSelect");
+      if (partsInput) partsInput.value = formatRegisteredPartLabel(pOpen);
+      showErr("catalogMsg", "");
       document.getElementById("detailPanel").style.display = "block";
       document.getElementById("detailPartLabel").textContent = partNo;
-      const p = catalogParts.find(x => x.partNo === partNo);
+      const p = pOpen;
       document.getElementById("editPartName").value = p ? p.partName : "";
       showErr("detailMsg", "");
       showErr("detailOk", "");
@@ -396,14 +768,20 @@
     }
 
     function getSelectedCatalogPartNo() {
-      return document.getElementById("partsSelect").value || null;
+      return resolvePartNoInput(document.getElementById("partsSelect").value) || null;
     }
 
     function updatePartsSummary() {
       const el = document.getElementById("partsSummary");
       if (!el) return;
-      el.textContent = "";
-      el.style.display = "none";
+      const n = catalogParts.length;
+      if (!n) {
+        el.textContent = "No parts registered for this format.";
+        el.style.display = "block";
+        return;
+      }
+      el.textContent = `Total ${n} parts`;
+      el.style.display = "block";
     }
 
     async function refreshDetail() {
@@ -413,6 +791,7 @@
       const data = await res.json();
       if (!res.ok) {
         showErr("detailMsg", data.message || JSON.stringify(data));
+        emptyAdminDetailTables();
         return;
       }
 
@@ -420,30 +799,34 @@
 
       const p = catalogParts.find(x => x.partNo === selectedPart);
       const procs = p ? p.processes : [];
-      document.getElementById("drProc").innerHTML = buildProcessOptionsHtml("");
-      document.getElementById("pcProc").innerHTML = buildProcessOptionsHtml("");
+      document.getElementById("drProc").innerHTML = buildProcessOptionsHtml("", false);
+      document.getElementById("pcProc").innerHTML = buildProcessOptionsHtml("", false);
       document.querySelector("#procTable tbody").innerHTML = procs.map(pr => `
         <tr data-pid="${pr.processMasterId}">
           <td><input value="${escapeHtml(pr.processName)}" class="pname" style="width:100%;min-width:160px;" /></td>
-          <td>${pr.displayOrder}</td>
+          <td><input value="${pr.displayOrder}" class="porder" style="width:72px;" inputmode="numeric" /></td>
           <td><input type="checkbox" class="pact" ${pr.activeFlag ? "checked" : ""} /></td>
           <td class="row-actions"><button type="button" class="saveProc">Save</button> <button type="button" class="delProc btn-del">Delete</button></td>
         </tr>
       `).join("");
       document.querySelectorAll(".saveProc").forEach((btn, i) => {
         const tr = btn.closest("tr");
-        btn.onclick = () => saveProcRow(tr);
+        btn.onclick = () => {
+          runActionWithButtonFeedback(btn, () => saveProcRow(tr));
+        };
       });
       document.querySelectorAll(".delProc").forEach((btn) => {
-        btn.onclick = () => deleteProcRow(btn.closest("tr"));
+        btn.onclick = () => {
+          runActionWithButtonFeedback(btn, () => deleteProcRow(btn.closest("tr")));
+        };
       });
 
       document.querySelector("#drawTable tbody").innerHTML = (data.drawings || []).map(d => `
         <tr data-did="${d.drawingRefId}">
-          <td>${renderProcessSelect("dproc", d.processCode, 140)}</td>
+          <td>${renderProcessSelect("dproc", d.processCode, "100%")}</td>
           <td><input value="${escapeHtml(d.drawingNo)}" class="dno" style="width:100px;" /></td>
           <td><input value="${escapeHtml(d.drawingName || "")}" class="dname" style="width:140px;" /></td>
-          <td><input value="${escapeHtml(d.fileUrl || "")}" class="durl" style="width:200px;" /></td>
+          <td><input value="${escapeHtml(d.fileUrl || "")}" class="durl" /></td>
           <td><input type="checkbox" class="dact" ${d.activeFlag ? "checked" : ""} /></td>
           <td class="row-actions"><button type="button" class="saveDr">Save</button> <button type="button" class="delDr btn-del">Delete</button></td>
         </tr>
@@ -451,40 +834,76 @@
       document.querySelectorAll(".saveDr").forEach(btn => {
         btn.onclick = () => {
           const tr = btn.closest("tr");
-          saveDrawingRow(tr);
+          runActionWithButtonFeedback(btn, () => saveDrawingRow(tr));
         };
       });
       document.querySelectorAll(".delDr").forEach((btn) => {
-        btn.onclick = () => deleteDrawingRow(btn.closest("tr"));
+        btn.onclick = () => {
+          runActionWithButtonFeedback(btn, () => deleteDrawingRow(btn.closest("tr")));
+        };
       });
 
-      document.querySelector("#pcTable tbody").innerHTML = (data.pointChecks || []).map(c => `
-        <tr data-pcid="${c.pointCheckRefId}">
-          <td>${renderProcessSelect("pcproc", c.processCode, 140)}</td>
+      const pointChecksSorted = sortPointChecksForAdmin(data.pointChecks || [], procs);
+      let prevPcProcKey = null;
+      let pcProcStripe = 0;
+      document.querySelector("#pcTable tbody").innerHTML = pointChecksSorted.map((c) => {
+        const procKey = String(c.processCode ?? "").trim();
+        if (prevPcProcKey !== null && procKey !== prevPcProcKey) {
+          pcProcStripe = 1 - pcProcStripe;
+        }
+        prevPcProcKey = procKey;
+        const stripeClass = pcProcStripe === 0 ? "pc-row-proc-a" : "pc-row-proc-b";
+        return `
+        <tr data-pcid="${c.pointCheckRefId}" class="${stripeClass}">
+          <td>${renderProcessSelect("pcproc", c.processCode, "100%")}</td>
           <td><input value="${escapeHtml(c.checkCode)}" class="pccode" style="width:36px;" maxlength="1" /></td>
-          <td><input value="${escapeHtml(c.pointCheckText || "")}" class="pctext" style="width:180px;" /></td>
+          <td><input value="${escapeHtml(c.pointCheckText || "")}" class="pctext" /></td>
           <td><input value="${escapeHtml(c.criteria || "")}" class="pccrit" style="width:120px;" /></td>
+          <td><input value="${escapeHtml(c.criteriaMin == null ? "" : c.criteriaMin)}" class="pcmin" inputmode="decimal" /></td>
+          <td><input value="${escapeHtml(c.criteriaMax == null ? "" : c.criteriaMax)}" class="pcmax" inputmode="decimal" /></td>
           <td><input value="${escapeHtml(c.checkMethod || "")}" class="pcmet" style="width:100px;" /></td>
+          <td>
+            <select class="pcinputmode" style="width:100px;">
+              <option value="OKNG" ${(String(c.inputMode || "OKNG").toUpperCase() === "OKNG") ? "selected" : ""}>OK/NG</option>
+              <option value="NUMERIC" ${(String(c.inputMode || "OKNG").toUpperCase() === "NUMERIC") ? "selected" : ""}>Numeric</option>
+            </select>
+          </td>
           <td><input type="checkbox" class="pcact" ${c.activeFlag ? "checked" : ""} /></td>
           <td class="row-actions"><button type="button" class="savePc">Save</button> <button type="button" class="delPc btn-del">Delete</button></td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
       document.querySelectorAll(".savePc").forEach(btn => {
-        btn.onclick = () => savePcRow(btn.closest("tr"));
+        btn.onclick = () => {
+          runActionWithButtonFeedback(btn, () => savePcRow(btn.closest("tr")));
+        };
       });
       document.querySelectorAll(".delPc").forEach((btn) => {
-        btn.onclick = () => deletePcRow(btn.closest("tr"));
+        btn.onclick = () => {
+          runActionWithButtonFeedback(btn, () => deletePcRow(btn.closest("tr")));
+        };
       });
     }
 
     async function saveProcRow(tr) {
       const id = tr.dataset.pid;
       const processName = tr.querySelector(".pname").value.trim();
+      const orderRaw = tr.querySelector(".porder").value.trim();
+      const payload = { processName };
+      if (orderRaw !== "") {
+        const displayOrder = Number(orderRaw);
+        if (!Number.isInteger(displayOrder) || displayOrder < 0) {
+          showErr("detailMsg", "Order must be an integer >= 0.");
+          return;
+        }
+        payload.displayOrder = displayOrder;
+      }
       const activeFlag = tr.querySelector(".pact").checked;
+      payload.activeFlag = activeFlag;
       const res = await fetch(`/api/admin/processes/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ processName, activeFlag })
+        body: JSON.stringify(payload)
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
@@ -517,12 +936,15 @@
       const checkCode = tr.querySelector(".pccode").value.trim();
       const pointCheckText = tr.querySelector(".pctext").value.trim();
       const criteria = tr.querySelector(".pccrit").value.trim() || null;
+      const criteriaMin = tr.querySelector(".pcmin").value.trim() || null;
+      const criteriaMax = tr.querySelector(".pcmax").value.trim() || null;
       const checkMethod = tr.querySelector(".pcmet").value.trim() || null;
+      const inputMode = tr.querySelector(".pcinputmode").value;
       const activeFlag = tr.querySelector(".pcact").checked;
       const res = await fetch(`/api/admin/point-checks/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ processCode, checkCode, pointCheckText, criteria, checkMethod, activeFlag })
+        body: JSON.stringify({ processCode, checkCode, pointCheckText, criteria, criteriaMin, criteriaMax, checkMethod, inputMode, activeFlag })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
@@ -596,169 +1018,231 @@
       loadCatalog();
     };
 
-    document.getElementById("reloadCatalog").onclick = loadCatalog;
-    document.getElementById("partsSelect").onchange = () => {
+    document.getElementById("reloadCatalog").onclick = () => {
+      runActionWithButtonFeedback("reloadCatalog", loadCatalog);
+    };
+    const partsSelectInputEl = document.getElementById("partsSelect");
+    partsSelectInputEl.onchange = () => {
+      const raw = String(partsSelectInputEl.value || "").trim();
+      if (!raw) {
+        selectedPart = null;
+        document.getElementById("detailPanel").style.display = "none";
+        updatePartsSummary();
+        return;
+      }
+      const resolved = resolvePartNoInput(partsSelectInputEl.value);
+      if (!resolved) {
+        resetMasterDetailClosed("");
+        updatePartsSummary();
+        return;
+      }
+      selectedPart = resolved;
+      const p = catalogParts.find((x) => x.partNo === resolved);
+      partsSelectInputEl.value = p ? formatRegisteredPartLabel(p) : resolved;
       updatePartsSummary();
     };
-    document.getElementById("btnOpenPart").onclick = async () => {
-      const partNo = getSelectedCatalogPartNo();
-      if (!partNo) return;
-      await openPart(partNo);
-    };
-    document.getElementById("btnDeletePart").onclick = async () => {
-      const partNo = getSelectedCatalogPartNo();
-      if (!partNo) return;
-      await deletePartFromCatalog(partNo);
-    };
-    document.getElementById("btnSaveBranding").onclick = async () => {
-      showErr("brandingMsg", "");
-      showErr("brandingOk", "");
-      const companyName = document.getElementById("brandCompany").value.trim();
-      const departmentName = document.getElementById("brandDept").value.trim();
-      const logoUrl = document.getElementById("brandLogo").value.trim();
-      const res = await fetch(`/api/admin/header-branding?formatId=${encodeURIComponent(formatId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, departmentName, logoUrl })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showErr("brandingMsg", data.message || res.status);
-        return;
+    partsSelectInputEl.addEventListener("blur", () => {
+      partsSelectInputEl.dispatchEvent(new Event("change"));
+    });
+    partsSelectInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        partsSelectInputEl.dispatchEvent(new Event("change"));
       }
-      const ok = document.getElementById("brandingOk");
-      ok.textContent = "Saved";
-      ok.style.display = "block";
-      setTimeout(() => { ok.style.display = "none"; }, 1800);
+    });
+    document.getElementById("btnOpenPart").onclick = () => {
+      runActionWithButtonFeedback("btnOpenPart", async () => {
+        const partNo = getSelectedCatalogPartNo();
+        if (!partNo) {
+          resetMasterDetailClosed(
+            "Select a valid part (exact part no or a unique match from the list), then Open."
+          );
+          return;
+        }
+        await openPart(partNo);
+      });
     };
-    document.getElementById("btnUploadBrandLogo").onclick = async () => {
-      showErr("brandingMsg", "");
-      const file = document.getElementById("brandLogoFile").files[0];
-      const fileUrl = await uploadImageFile("logo", file, "brandingMsg");
-      if (!fileUrl) return;
-      document.getElementById("brandLogo").value = fileUrl;
-      const ok = document.getElementById("brandingOk");
-      ok.textContent = `Uploaded: ${fileUrl}`;
-      ok.style.display = "block";
-      setTimeout(() => { ok.style.display = "none"; }, 2400);
+    document.getElementById("btnDeletePart").onclick = () => {
+      runActionWithButtonFeedback("btnDeletePart", async () => {
+        const partNo = getSelectedCatalogPartNo();
+        if (!partNo) return;
+        await deletePartFromCatalog(partNo);
+      });
+    };
+    document.getElementById("btnSaveBranding").onclick = () => {
+      runActionWithButtonFeedback("btnSaveBranding", async () => {
+        showErr("brandingMsg", "");
+        showErr("brandingOk", "");
+        const companyName = document.getElementById("brandCompany").value.trim();
+        const departmentName = document.getElementById("brandDept").value.trim();
+        const logoUrl = document.getElementById("brandLogo").value.trim();
+        const res = await fetch(`/api/admin/header-branding?formatId=${encodeURIComponent(formatId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyName, departmentName, logoUrl })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showErr("brandingMsg", data.message || res.status);
+          return;
+        }
+        const ok = document.getElementById("brandingOk");
+        ok.textContent = "Saved";
+        ok.style.display = "block";
+        setTimeout(() => { ok.style.display = "none"; }, 1800);
+      });
+    };
+    document.getElementById("btnUploadBrandLogo").onclick = () => {
+      runActionWithButtonFeedback("btnUploadBrandLogo", async () => {
+        showErr("brandingMsg", "");
+        const file = document.getElementById("brandLogoFile").files[0];
+        const fileUrl = await uploadImageFile("logo", file, "brandingMsg");
+        if (!fileUrl) return;
+        document.getElementById("brandLogo").value = fileUrl;
+        const ok = document.getElementById("brandingOk");
+        ok.textContent = `Uploaded: ${fileUrl}`;
+        ok.style.display = "block";
+        setTimeout(() => { ok.style.display = "none"; }, 2400);
+      });
     };
 
-    document.getElementById("btnAddPart").onclick = async () => {
-      showErr("catalogMsg", "");
-      const partNo = document.getElementById("newPartNo").value.trim();
-      const partName = document.getElementById("newPartName").value.trim();
-      const res = await fetch("/api/admin/parts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formatId, partNo, partName })
+    document.getElementById("btnAddPart").onclick = () => {
+      runActionWithButtonFeedback("btnAddPart", async () => {
+        showErr("catalogMsg", "");
+        const partNo = document.getElementById("newPartNo").value.trim();
+        const partName = document.getElementById("newPartName").value.trim();
+        const res = await fetch("/api/admin/parts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formatId, partNo, partName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showErr("catalogMsg", data.message || JSON.stringify(data));
+          return;
+        }
+        document.getElementById("newPartNo").value = "";
+        document.getElementById("newPartName").value = "";
+        await loadCatalog();
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showErr("catalogMsg", data.message || JSON.stringify(data));
-        return;
-      }
-      document.getElementById("newPartNo").value = "";
-      document.getElementById("newPartName").value = "";
-      await loadCatalog();
     };
 
-    document.getElementById("btnSavePartName").onclick = async () => {
-      showErr("detailMsg", "");
-      const targetPartNo = (document.getElementById("detailPartLabel").textContent || "").trim() || selectedPart;
-      if (!targetPartNo) {
-        showErr("detailMsg", "No part is open.");
-        return;
-      }
-      const partName = document.getElementById("editPartName").value.trim();
-      const res = await fetch(`/api/admin/parts/${encodeURIComponent(targetPartNo)}/name?formatId=${encodeURIComponent(formatId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ partName })
+    document.getElementById("btnSavePartName").onclick = () => {
+      runActionWithButtonFeedback("btnSavePartName", async () => {
+        showErr("detailMsg", "");
+        const targetPartNo = selectedPart;
+        if (!targetPartNo) {
+          showErr("detailMsg", "No part is open.");
+          return;
+        }
+        const partName = document.getElementById("editPartName").value.trim();
+        const res = await fetch(`/api/admin/parts/${encodeURIComponent(targetPartNo)}/name?formatId=${encodeURIComponent(formatId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ partName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+        flashOk();
+        await loadCatalog();
+        await openPart(targetPartNo);
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
-      flashOk();
-      await loadCatalog();
-      await openPart(targetPartNo);
     };
 
-    document.getElementById("btnSaveCustomerAbbrev").onclick = async () => {
-      showErr("detailMsg", "");
-      const customerAbbrev = document.getElementById("editCustomerAbbrev").value.trim();
-      const res = await fetch(`/api/admin/parts/${encodeURIComponent(selectedPart)}/customer?formatId=${encodeURIComponent(formatId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerAbbrev })
+    document.getElementById("btnSaveCustomerAbbrev").onclick = () => {
+      runActionWithButtonFeedback("btnSaveCustomerAbbrev", async () => {
+        showErr("detailMsg", "");
+        const customerAbbrev = document.getElementById("editCustomerAbbrev").value.trim();
+        const res = await fetch(`/api/admin/parts/${encodeURIComponent(selectedPart)}/customer?formatId=${encodeURIComponent(formatId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customerAbbrev })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+        flashOk();
+        await refreshDetail();
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
-      flashOk();
-      await refreshDetail();
     };
 
-    document.getElementById("btnAddProc").onclick = async () => {
-      const processName = document.getElementById("newProcName").value.trim();
-      if (!processName) return;
-      const res = await fetch("/api/admin/processes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formatId, partNo: selectedPart, processName })
+    document.getElementById("btnAddProc").onclick = () => {
+      runActionWithButtonFeedback("btnAddProc", async () => {
+        const processName = document.getElementById("newProcName").value.trim();
+        if (!processName) return;
+        const res = await fetch("/api/admin/processes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formatId, partNo: selectedPart, processName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+        document.getElementById("newProcName").value = "";
+        flashOk();
+        await loadCatalog();
+        await openPart(selectedPart);
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
-      document.getElementById("newProcName").value = "";
-      flashOk();
-      await loadCatalog();
-      await openPart(selectedPart);
     };
 
-    document.getElementById("btnAddDr").onclick = async () => {
-      const processCode = document.getElementById("drProc").value.trim() || null;
-      const drawingNo = document.getElementById("drNo").value.trim();
-      const drawingName = document.getElementById("drName").value.trim() || null;
-      const fileUrl = document.getElementById("drUrl").value.trim() || null;
-      if (!drawingNo) { showErr("detailMsg", "drawingNo is required"); return; }
-      const res = await fetch("/api/admin/drawings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formatId, partNo: selectedPart, processCode, drawingNo, drawingName, fileUrl })
+    document.getElementById("btnAddDr").onclick = () => {
+      runActionWithButtonFeedback("btnAddDr", async () => {
+        const processCode = document.getElementById("drProc").value.trim();
+        if (!processCode) { showErr("detailMsg", "Select process."); return; }
+        const drawingNo = document.getElementById("drNo").value.trim();
+        const drawingName = document.getElementById("drName").value.trim() || null;
+        const fileUrl = document.getElementById("drUrl").value.trim() || null;
+        if (!drawingNo && !fileUrl) { showErr("detailMsg", "drawingNo or fileUrl is required"); return; }
+        const res = await fetch("/api/admin/drawings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formatId, partNo: selectedPart, processCode, drawingNo, drawingName, fileUrl })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+        document.getElementById("drNo").value = "";
+        document.getElementById("drName").value = "";
+        document.getElementById("drUrl").value = "";
+        flashOk();
+        await refreshDetail();
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
-      document.getElementById("drNo").value = "";
-      document.getElementById("drName").value = "";
-      document.getElementById("drUrl").value = "";
-      flashOk();
-      await refreshDetail();
     };
-    document.getElementById("btnUploadDrawing").onclick = async () => {
-      showErr("detailMsg", "");
-      const file = document.getElementById("drFile").files[0];
-      const fileUrl = await uploadImageFile("drawing", file, "detailMsg");
-      if (!fileUrl) return;
-      document.getElementById("drUrl").value = fileUrl;
-      flashOk("Image uploaded");
+    document.getElementById("btnUploadDrawing").onclick = () => {
+      runActionWithButtonFeedback("btnUploadDrawing", async () => {
+        showErr("detailMsg", "");
+        const file = document.getElementById("drFile").files[0];
+        const fileUrl = await uploadImageFile("drawing", file, "detailMsg");
+        if (!fileUrl) return;
+        document.getElementById("drUrl").value = fileUrl;
+        flashOk("Image uploaded");
+      });
     };
 
-    document.getElementById("btnAddPc").onclick = async () => {
-      const processCode = document.getElementById("pcProc").value.trim() || null;
-      const checkCode = document.getElementById("pcCode").value;
-      const pointCheckText = document.getElementById("pcText").value.trim();
-      const criteria = document.getElementById("pcCrit").value.trim() || null;
-      const checkMethod = document.getElementById("pcMethod").value.trim() || null;
-      if (!pointCheckText) { showErr("detailMsg", "Text is required"); return; }
-      const res = await fetch("/api/admin/point-checks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formatId, partNo: selectedPart, processCode, checkCode, pointCheckText, criteria, checkMethod })
+    document.getElementById("btnAddPc").onclick = () => {
+      runActionWithButtonFeedback("btnAddPc", async () => {
+        const processCode = document.getElementById("pcProc").value.trim();
+        if (!processCode) { showErr("detailMsg", "Select process."); return; }
+        const checkCode = document.getElementById("pcCode").value;
+        const pointCheckText = document.getElementById("pcText").value.trim();
+        const criteria = document.getElementById("pcCrit").value.trim() || null;
+        const criteriaMin = document.getElementById("pcMin").value.trim() || null;
+        const criteriaMax = document.getElementById("pcMax").value.trim() || null;
+        const checkMethod = document.getElementById("pcMethod").value.trim() || null;
+        const inputMode = document.getElementById("pcInputMode").value;
+        if (!pointCheckText) { showErr("detailMsg", "Text is required"); return; }
+        const res = await fetch("/api/admin/point-checks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formatId, partNo: selectedPart, processCode, checkCode, pointCheckText, criteria, criteriaMin, criteriaMax, checkMethod, inputMode })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
+        document.getElementById("pcText").value = "";
+        document.getElementById("pcCrit").value = "";
+        document.getElementById("pcMin").value = "";
+        document.getElementById("pcMax").value = "";
+        document.getElementById("pcMethod").value = "";
+        flashOk();
+        await refreshDetail();
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showErr("detailMsg", data.message || res.status); return; }
-      document.getElementById("pcText").value = "";
-      document.getElementById("pcCrit").value = "";
-      document.getElementById("pcMethod").value = "";
-      flashOk();
-      await refreshDetail();
     };
 
     (async () => {

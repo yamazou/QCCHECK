@@ -27,7 +27,7 @@ BEGIN
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_pm_format FOREIGN KEY (format_id) REFERENCES dbo.format_master(format_id),
-        CONSTRAINT UQ_pm_format_order UNIQUE(format_id, display_order)
+        CONSTRAINT UQ_pm_format_part_order UNIQUE(format_id, part_no, display_order)
     );
 END
 GO
@@ -90,14 +90,16 @@ BEGIN
         qty INT NULL,
         ok_count INT NULL,
         ng_count INT NULL,
+        machine_no NVARCHAR(100) NULL,
         pic NVARCHAR(100) NULL,
+        sop_check BIT NULL,
         leader_check NVARCHAR(20) NULL,
         remarks NVARCHAR(500) NULL,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_cr_process FOREIGN KEY (process_id) REFERENCES dbo.checksheet_process(process_id),
         CONSTRAINT UQ_cr_process_row UNIQUE(process_id, row_no),
-        CONSTRAINT CK_cr_row_no CHECK (row_no BETWEEN 1 AND 31),
+        CONSTRAINT CK_cr_row_no CHECK (row_no >= 1),
         CONSTRAINT CK_cr_qty_nonneg CHECK (
             (qty IS NULL OR qty >= 0) AND
             (ok_count IS NULL OR ok_count >= 0) AND
@@ -113,12 +115,12 @@ BEGIN
         row_check_id BIGINT IDENTITY(1,1) PRIMARY KEY,
         row_id BIGINT NOT NULL,
         check_code NCHAR(1) NOT NULL,
-        result NVARCHAR(2) NULL,
+        result NVARCHAR(50) NULL,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_crc_row FOREIGN KEY (row_id) REFERENCES dbo.checksheet_row(row_id),
         CONSTRAINT CK_crc_code CHECK (check_code IN ('A','B','C','D','E','F','G')),
-        CONSTRAINT CK_crc_result CHECK (result IN ('OK','NG') OR result IS NULL),
+        CONSTRAINT CK_crc_result CHECK (LEN(LTRIM(RTRIM(result))) <= 50 OR result IS NULL),
         CONSTRAINT UQ_crc_row_code UNIQUE(row_id, check_code)
     );
 END
