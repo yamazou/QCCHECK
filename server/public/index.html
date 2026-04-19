@@ -26,7 +26,7 @@
     }
     .header-col-brand .brand-logo { display: flex; align-items: center; justify-content: center; width: 100%; }
     .header-col-brand .brand-logo img { max-width: 100%; max-height: 76px; object-fit: contain; }
-    .header-col-brand .brand-name { font-weight: 700; font-size: 12px; line-height: 1.25; }
+    .header-col-brand .brand-name { font-weight: 700; font-size: 16px; line-height: 1.25; }
     .header-col-brand .dept { font-style: italic; font-weight: 500; font-size: 11px; line-height: 1.2; }
     .header-col-meta {
       border-right: 1px solid #333;
@@ -489,7 +489,7 @@
 </head>
 <body>
   <div id="printRoot" class="print-root" aria-hidden="true"></div>
-  <p class="admin-nav"><strong>QC Check</strong> · <a href="/daily-check-history.html">Monthly History</a> · <a href="/admin.html">Master Data</a></p>
+  <p class="admin-nav"><strong>QC Check</strong> · <a href="/daily-check-history.html">Monthly History</a> · <a id="adminMasterDataLink" href="/admin.html">Master Data</a></p>
   <div class="screen-sheet">
     <div class="header-sheet">
     <div class="header-main">
@@ -529,6 +529,7 @@
     <label>Department</label><input id="department" value="Production Department" />
     <label>Sheet Date</label><input id="sheetDate" type="date" />
     <label>Created By</label><input id="createdBy" value="operator01" />
+    <datalist id="machineNoDatalist"></datalist>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="ref-wrap">
@@ -644,7 +645,8 @@
       partNameOptions: [],
       partNoOptions: [],
       headerBranding: null,
-      editingHeaderId: null
+      editingHeaderId: null,
+      machines: []
     };
 
     const DEFAULT_HEADER_BRANDING = {
@@ -1110,6 +1112,32 @@
       sel.innerHTML = state.formats.map(f => `<option value="${f.formatId}">${f.formatCode} - ${f.formatName}</option>`).join("");
     }
 
+    function applyMachineDatalist(rows) {
+      state.machines = Array.isArray(rows) ? rows : [];
+      const dl = document.getElementById("machineNoDatalist");
+      if (!dl) return;
+      dl.replaceChildren();
+      for (const m of state.machines) {
+        const v = String(m.machineNo || "").trim();
+        if (!v) continue;
+        const opt = document.createElement("option");
+        opt.value = v;
+        const lab = String(m.machineName || "").trim();
+        if (lab) opt.label = lab;
+        dl.appendChild(opt);
+      }
+    }
+
+    async function loadMachineMasterOptions() {
+      try {
+        const res = await fetch("/api/machines");
+        const data = res.ok ? await res.json() : [];
+        applyMachineDatalist(data);
+      } catch (_e) {
+        applyMachineDatalist([]);
+      }
+    }
+
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = state.processes.map((p, i) =>
@@ -1208,7 +1236,7 @@
                       <button type="button" class="delete-record-btn" data-delete-record="${recordIdx}">Delete</button>
                     </div>
                   </td>
-                  <td rowspan="${ROWS_PER_RECORD}"><input data-i="${base}" data-k="machineNo" value="${header.machineNo || ""}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input data-i="${base}" data-k="machineNo" list="machineNoDatalist" value="${header.machineNo || ""}" autocomplete="off"></td>
                   <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="startTime" value="${header.startTime || "00:00"}"></td>
                   <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="finishTime" value="${header.finishTime || "00:00"}"></td>
                   <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="qty" value="${header.qty}"></td>
@@ -1311,11 +1339,25 @@
     }
 
     let syncingPartSelects = false;
+    function updateAdminMasterDataHref() {
+      const a = document.getElementById("adminMasterDataLink");
+      if (!a) return;
+      const fmtEl = document.getElementById("format");
+      const fid = fmtEl && fmtEl.value ? String(fmtEl.value).trim() : "";
+      const partNo = resolvePartNoInput(document.getElementById("partNoSelect").value);
+      if (fid && partNo) {
+        a.href = `/admin.html?formatId=${encodeURIComponent(fid)}&partNo=${encodeURIComponent(partNo)}`;
+      } else {
+        a.href = "/admin.html";
+      }
+    }
+
     function syncPartSelectsFromPartNo(partNo) {
       syncingPartSelects = true;
       document.getElementById("partNameSelect").value = state.partNameLabelByNo[partNo] || state.partNamesByNo[partNo] || partNo || "";
       document.getElementById("partNoSelect").value = partNo;
       syncingPartSelects = false;
+      updateAdminMasterDataHref();
     }
 
     function resolvePartNameInput(raw) {
@@ -1337,7 +1379,7 @@
         /* ignore */
       }
       v = v.replace(/[\u200B-\u200D\uFEFF]/g, "");
-      return v.replace(/\s+/g, "").toUpperCase();
+      return v.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
     }
 
     function resolvePartNoInput(raw) {
@@ -1402,49 +1444,53 @@
     }
 
     async function loadPartOptions() {
-      const formatId = document.getElementById("format").value;
-      state.editingHeaderId = null;
-      state.partNamesByNo = {};
-      state.partNameLabelByNo = {};
-      state.partNameOptions = [];
-      state.processes = [];
-      state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
-      state.selectedDrawingIndex = 0;
-      state.selectedProcessIndex = 0;
-      state.rowsByProcess = {};
-      fillPartSelects([]);
-      if (!formatId) {
-        applyHeaderBranding(DEFAULT_HEADER_BRANDING);
-        renderTabs();
-        updateHeaderProcess();
-        renderReferences();
-        renderTable();
-        return;
-      }
       try {
-        const bRes = await fetch(`/api/formats/${formatId}/header-branding`);
-        const bData = await bRes.json().catch(() => ({}));
-        state.headerBranding = bRes.ok ? bData : null;
-      } catch (_e) {
-        state.headerBranding = null;
-      }
-      applyHeaderBranding(state.headerBranding);
-      const res = await fetch(`/api/formats/${formatId}/parts`);
-      const parts = await res.json();
-      if (!res.ok) {
-        document.getElementById("result").textContent = parts.message || JSON.stringify(parts);
+        const formatId = document.getElementById("format").value;
+        state.editingHeaderId = null;
+        state.partNamesByNo = {};
+        state.partNameLabelByNo = {};
+        state.partNameOptions = [];
+        state.processes = [];
+        state.references = { drawings: [], pointChecks: [], customerAbbrev: null };
+        state.selectedDrawingIndex = 0;
+        state.selectedProcessIndex = 0;
+        state.rowsByProcess = {};
+        fillPartSelects([]);
+        if (!formatId) {
+          applyHeaderBranding(DEFAULT_HEADER_BRANDING);
+          renderTabs();
+          updateHeaderProcess();
+          renderReferences();
+          renderTable();
+          return;
+        }
+        try {
+          const bRes = await fetch(`/api/formats/${formatId}/header-branding`);
+          const bData = await bRes.json().catch(() => ({}));
+          state.headerBranding = bRes.ok ? bData : null;
+        } catch (_e) {
+          state.headerBranding = null;
+        }
+        applyHeaderBranding(state.headerBranding);
+        const res = await fetch(`/api/formats/${formatId}/parts`);
+        const parts = await res.json();
+        if (!res.ok) {
+          document.getElementById("result").textContent = parts.message || JSON.stringify(parts);
+          renderTabs();
+          updateHeaderProcess();
+          renderReferences();
+          renderTable();
+          return;
+        }
+        fillPartSelects(parts);
         renderTabs();
         updateHeaderProcess();
         renderReferences();
         renderTable();
-        return;
+        document.getElementById("result").textContent = "";
+      } finally {
+        updateAdminMasterDataHref();
       }
-      fillPartSelects(parts);
-      renderTabs();
-      updateHeaderProcess();
-      renderReferences();
-      renderTable();
-      document.getElementById("result").textContent = "";
     }
 
     function fmtSheetDate(v) {
@@ -1597,12 +1643,19 @@
       }
       document.getElementById("result").textContent = "Loading…";
       const monthUrl = `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNo)}&effDate=${encodeURIComponent(effDate)}`;
-      const [processRes, refRes, monthRes] = await Promise.all([
+      const [processRes, refRes, monthRes, machRes] = await Promise.all([
         fetch(`/api/formats/${formatId}/processes?partNo=${encodeURIComponent(partNo)}`),
         fetch(`/api/references?formatId=${formatId}&partNo=${encodeURIComponent(partNo)}`),
-        fetch(monthUrl)
+        fetch(monthUrl),
+        fetch("/api/machines")
       ]);
-      const [processData, refData, monthData] = await Promise.all([processRes.json(), refRes.json(), monthRes.json()]);
+      const [processData, refData, monthData, machData] = await Promise.all([
+        processRes.json(),
+        refRes.json(),
+        monthRes.json(),
+        machRes.json()
+      ]);
+      applyMachineDatalist(machRes.ok ? machData : []);
       if (!processRes.ok) {
         clearLoadedSheetView(processData.message || JSON.stringify(processData));
         return;
@@ -1939,6 +1992,7 @@
       const qProcessName = params.get("processName") || params.get("process");
 
       await loadFormats();
+      await loadMachineMasterOptions();
       if (qFmt) {
         const fmtSel = document.getElementById("format");
         const exists = [...fmtSel.options].some((o) => String(o.value) === String(qFmt));

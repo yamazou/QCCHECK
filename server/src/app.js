@@ -10,6 +10,14 @@ const { registerAdminRoutes } = require("./adminRoutes");
 const app = express();
 app.use(express.json({ limit: "5mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
+/** Browsers treat conditional GETs as 304; fetch() sets ok=false for 304, which breaks JSON clients. */
+app.use((req, res, next) => {
+  if (String(req.path || "").startsWith("/api")) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.set("Pragma", "no-cache");
+  }
+  next();
+});
 
 function normalizePartNo(input) {
   let s = String(input || "").trim();
@@ -19,7 +27,8 @@ function normalizePartNo(input) {
     /* ignore */
   }
   s = s.replace(/[\u200B-\u200D\uFEFF]/g, "");
-  return s.replace(/\s+/g, "").toUpperCase();
+  s = s.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
+  return s;
 }
 
 /** T-SQL expression aligned with {@link normalizePartNo} for WHERE/JOIN on nvarchar part_no columns. */
@@ -32,6 +41,7 @@ function sqlNormPartNoExpr(column) {
   }
   e = `REPLACE(${e}, NCHAR(0x00A0), N'')`;
   e = `REPLACE(${e}, NCHAR(0x3000), N'')`;
+  e = `REPLACE(${e}, N'-', N'')`;
   e = `UPPER(${e})`;
   return e;
 }
@@ -258,12 +268,53 @@ async function getPointCheckRefSchema(pool) {
   return pointCheckRefSchemaCache;
 }
 
+/** `res.json` / `JSON.stringify` throw on bigint (common for BIGINT columns in node-mssql). */
+function jsonSanitizeForResponse(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value === "bigint") return String(value);
+  if (Buffer.isBuffer(value)) return value.length > 0 && value[0] === 1;
+  if (Array.isArray(value)) return value.map(jsonSanitizeForResponse);
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isNaN(t) ? null : value.toISOString();
+  }
+  if (typeof value === "object") {
+    const o = {};
+    for (const [k, v] of Object.entries(value)) {
+      o[k] = jsonSanitizeForResponse(v);
+    }
+    return o;
+  }
+  return value;
+}
+
+/** Deep clone for API: stringify replacer hits every nested bigint (tedious Row spread can still hide some). */
+function serializeChecksheetDetailForClient(raw) {
+  try {
+    return JSON.parse(
+      JSON.stringify(raw, (_key, val) => {
+        if (typeof val === "bigint") return val.toString();
+        if (Buffer.isBuffer(val)) return val.length > 0 && val[0] === 1;
+        if (val instanceof Date) {
+          const t = val.getTime();
+          return Number.isNaN(t) ? null : val.toISOString();
+        }
+        return val;
+      })
+    );
+  } catch (_e) {
+    return jsonSanitizeForResponse(raw);
+  }
+}
+
 async function getChecksheetDetail(pool, headerId) {
-  const hid = sql.BigInt(headerId);
+  const n = Number(headerId);
+  if (!Number.isFinite(n) || n <= 0) return null;
   const [headerRs, processRs, rowRs, checkRs] = await Promise.all([
     pool
       .request()
-      .input("headerId", hid)
+      .input("headerId", sql.BigInt, n)
       .query(`
       SELECT header_id AS headerId, format_id AS formatId, part_no AS partNo, part_name AS partName,
              eff_date AS effDate, rev_no AS revNo, department, sheet_date AS sheetDate,
@@ -276,7 +327,7 @@ async function getChecksheetDetail(pool, headerId) {
     `),
     pool
       .request()
-      .input("headerId", hid)
+      .input("headerId", sql.BigInt, n)
       .query(`
       SELECT process_id AS processId, process_master_id AS processMasterId,
              process_name_snapshot AS processName, display_order AS displayOrder
@@ -286,7 +337,7 @@ async function getChecksheetDetail(pool, headerId) {
     `),
     pool
       .request()
-      .input("headerId", hid)
+      .input("headerId", sql.BigInt, n)
       .query(`
       SELECT r.row_id AS rowId, r.process_id AS processId, r.row_no AS rowNo, r.work_date AS workDate,
              CONVERT(varchar(8), r.start_time, 108) AS startTime,
@@ -301,7 +352,7 @@ async function getChecksheetDetail(pool, headerId) {
     `),
     pool
       .request()
-      .input("headerId", hid)
+      .input("headerId", sql.BigInt, n)
       .query(`
       SELECT c.row_id AS rowId, c.check_code AS checkCode, c.result
       FROM dbo.checksheet_row_check c
@@ -313,24 +364,31 @@ async function getChecksheetDetail(pool, headerId) {
   ]);
   if (headerRs.recordset.length === 0) return null;
 
+  /** BIGINT / Int can surface as number, string, or BigInt between queries — normalize Map keys. */
+  const idKey = (v) => (v == null || v === "" ? "" : String(v));
+
   const checksByRow = new Map();
   for (const c of checkRs.recordset) {
-    if (!checksByRow.has(c.rowId)) checksByRow.set(c.rowId, []);
-    checksByRow.get(c.rowId).push(c);
+    const rid = idKey(c.rowId);
+    if (!rid) continue;
+    if (!checksByRow.has(rid)) checksByRow.set(rid, []);
+    checksByRow.get(rid).push(c);
   }
 
   const rowsByProcess = new Map();
   for (const r of rowRs.recordset) {
-    if (!rowsByProcess.has(r.processId)) rowsByProcess.set(r.processId, []);
-    rowsByProcess.get(r.processId).push({ ...r, checks: checksByRow.get(r.rowId) || [] });
+    const pid = idKey(r.processId);
+    if (!pid) continue;
+    if (!rowsByProcess.has(pid)) rowsByProcess.set(pid, []);
+    rowsByProcess.get(pid).push({ ...r, checks: checksByRow.get(idKey(r.rowId)) || [] });
   }
 
   const processes = processRs.recordset.map((p) => ({
     ...p,
-    rows: rowsByProcess.get(p.processId) || []
+    rows: rowsByProcess.get(idKey(p.processId)) || []
   }));
 
-  return { ...headerRs.recordset[0], processes };
+  return serializeChecksheetDetailForClient({ ...headerRs.recordset[0], processes });
 }
 
 app.get("/api/health", async (_req, res) => {
@@ -351,6 +409,34 @@ app.get("/api/formats", async (_req, res) => {
       FROM dbo.format_master
       WHERE active_flag = 1
       ORDER BY format_id
+    `);
+    res.json(rs.recordset);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+/**
+ * Machines for checklist suggestions (active only), or full catalog for Monthly History sort (`forSort=1`).
+ */
+app.get("/api/machines", async (req, res) => {
+  const forSort = String(req.query.forSort || "").trim() === "1";
+  try {
+    const pool = await getPool();
+    const activeOnly = forSort ? "" : "WHERE active_flag = 1";
+    const rs = await pool.request().query(`
+      IF OBJECT_ID('dbo.machine_master', 'U') IS NULL
+        SELECT CAST(NULL AS INT) AS machineMasterId,
+               CAST(NULL AS NVARCHAR(100)) AS machineNo,
+               CAST(NULL AS NVARCHAR(200)) AS machineName,
+               CAST(NULL AS INT) AS displayOrder
+        WHERE 1 = 0;
+      ELSE
+        SELECT machine_master_id AS machineMasterId, machine_no AS machineNo, machine_name AS machineName,
+               display_order AS displayOrder
+        FROM dbo.machine_master
+        ${activeOnly}
+        ORDER BY display_order, machine_no;
     `);
     res.json(rs.recordset);
   } catch (e) {
@@ -762,6 +848,46 @@ app.put("/api/checksheets/:headerId", async (req, res) => {
   }
 });
 
+/**
+ * Part numbers that have a saved checksheet header for the format + effective month.
+ * Used by Monthly History (all parts) — not the same as process_master catalog parts.
+ */
+app.get("/api/checksheets/parts-for-month", async (req, res) => {
+  const formatId = Number(req.query.formatId);
+  const effDate = normalizeEffDate(req.query.effDate);
+  if (!formatId || !effDate) {
+    return res.status(400).json({ message: "formatId and effDate are required" });
+  }
+  try {
+    const pool = await getPool();
+    const rs = await pool
+      .request()
+      .input("formatId", sql.Int, formatId)
+      .input("effDate", sql.Date, effDate)
+      .query(`
+        SELECT LTRIM(RTRIM(part_no)) AS partNoRaw
+        FROM dbo.checksheet_header
+        WHERE format_id = @formatId
+          AND eff_date IS NOT NULL
+          AND YEAR(eff_date) = YEAR(@effDate)
+          AND MONTH(eff_date) = MONTH(@effDate)
+          AND part_no IS NOT NULL AND LTRIM(RTRIM(part_no)) <> N''
+      `);
+    const seen = new Set();
+    const out = [];
+    for (const row of rs.recordset || []) {
+      const p = normalizePartNo(row.partNoRaw);
+      if (!p || seen.has(p)) continue;
+      seen.add(p);
+      out.push({ partNo: p });
+    }
+    out.sort((a, b) => a.partNo.localeCompare(b.partNo, "en"));
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 app.get("/api/checksheets/for-month", async (req, res) => {
   const formatId = Number(req.query.formatId);
   const partNo = normalizePartNo(req.query.partNo);
@@ -771,20 +897,30 @@ app.get("/api/checksheets/for-month", async (req, res) => {
   }
   try {
     const pool = await getPool();
-    const hdrPnMonth = sqlNormPartNoExpr("part_no");
+    /** Match part_no with the same {@link normalizePartNo} as the client — SQL-only norm can diverge (NFKC, etc.). */
     const hRs = await pool
       .request()
       .input("formatId", sql.Int, formatId)
-      .input("partNo", sql.NVarChar(100), partNo)
       .input("effDate", sql.Date, effDate)
       .query(`
-        SELECT TOP 1 header_id AS headerId
+        SELECT header_id AS headerId, LTRIM(RTRIM(part_no)) AS partNoRaw
         FROM dbo.checksheet_header
-        WHERE format_id = @formatId AND ${hdrPnMonth} = @partNo AND eff_date = @effDate
+        WHERE format_id = @formatId
+          AND eff_date IS NOT NULL
+          AND YEAR(eff_date) = YEAR(@effDate)
+          AND MONTH(eff_date) = MONTH(@effDate)
+          AND part_no IS NOT NULL AND LTRIM(RTRIM(part_no)) <> N''
         ORDER BY updated_at DESC, header_id DESC
       `);
-    if (hRs.recordset.length === 0) return res.status(404).json({ message: "not found" });
-    const detail = await getChecksheetDetail(pool, hRs.recordset[0].headerId);
+    let headerId = null;
+    for (const row of hRs.recordset || []) {
+      if (normalizePartNo(row.partNoRaw) === partNo) {
+        headerId = row.headerId;
+        break;
+      }
+    }
+    if (headerId == null) return res.status(404).json({ message: "not found" });
+    const detail = await getChecksheetDetail(pool, headerId);
     if (!detail) return res.status(404).json({ message: "not found" });
     res.json(detail);
   } catch (e) {

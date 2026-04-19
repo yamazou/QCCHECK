@@ -31,6 +31,33 @@
     .sub { color: var(--muted); font-size: 13px; margin: 0; }
     a { color: var(--accent); }
     .toolbar { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+    .toolbar-row-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .toolbar-right {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+    .toolbar-right #exportBtn {
+      border: 1px solid #0e57bb;
+      background: #fff;
+      color: #0b63d8;
+      font-weight: 600;
+    }
+    .toolbar-right #exportBtn:hover:not(:disabled) {
+      background: #eef4ff;
+    }
+    .toolbar-right #exportBtn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: #f0f2f7;
+      color: #7b879b;
+      border-color: #cfd7e6;
+    }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
     /* Single-line filter bar: compact widths; horizontal scroll only if viewport is very narrow */
     .toolbar-filters {
@@ -52,16 +79,28 @@
       white-space: nowrap;
     }
     .toolbar-filters select,
+    .toolbar-filters input[type="text"],
     .toolbar-filters button {
       font-size: 12px;
       padding: 5px 6px;
       min-height: 30px;
     }
-    .toolbar-filters #format { width: 132px; max-width: 38vw; min-width: 0; }
-    .toolbar-filters #partNo { width: 118px; max-width: 32vw; min-width: 0; }
+    .toolbar-filters #format {
+      width: 132px;
+      max-width: 38vw;
+      min-width: 0;
+      background: #e4e9f2;
+      color: #4a5568;
+      border-color: #c0cad8;
+    }
+    .toolbar-filters #format:disabled {
+      opacity: 0.92;
+      cursor: not-allowed;
+    }
+    .toolbar-filters #partNo { width: 220px; max-width: 44vw; min-width: 0; }
     .toolbar-filters #effYear { width: 64px; min-width: 0; }
     .toolbar-filters #effMonth { width: 56px; min-width: 0; }
-    .toolbar-filters #process { width: 128px; max-width: 34vw; min-width: 0; }
+    .toolbar-filters #process { width: 160px; max-width: 40vw; min-width: 0; }
     .toolbar-filters #loadBtn { padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
     label { display: block; font-size: 12px; color: #334160; margin-bottom: 4px; }
     input, select, textarea {
@@ -178,14 +217,11 @@
     </div>
 
     <div class="toolbar">
+      <div class="toolbar-row-bar">
       <div class="toolbar-filters">
         <div class="fld">
           <label for="format">Format</label>
           <select id="format"></select>
-        </div>
-        <div class="fld">
-          <label for="partNo">Part No.</label>
-          <select id="partNo"></select>
         </div>
         <div class="fld">
           <label for="effYear">Year</label>
@@ -197,12 +233,23 @@
         </div>
         <div class="fld">
           <label for="process">Process</label>
-          <select id="process"></select>
+          <input id="process" type="text" list="processDatalist" autocomplete="off" placeholder="ALL" />
+          <datalist id="processDatalist"></datalist>
+        </div>
+        <div class="fld">
+          <label for="partNo">Part No</label>
+          <input id="partNo" type="text" list="partNoDatalist" autocomplete="off" placeholder="ALL" />
+          <datalist id="partNoDatalist"></datalist>
         </div>
         <div class="fld">
           <label class="visually-hidden" for="loadBtn">Load data</label>
           <button type="button" id="loadBtn">Load</button>
         </div>
+      </div>
+      <div class="toolbar-right">
+        <label class="visually-hidden" for="exportBtn">Export table to Excel</label>
+        <button type="button" id="exportBtn" disabled>Export</button>
+      </div>
       </div>
       <div id="err" class="err" aria-live="polite"></div>
     </div>
@@ -217,8 +264,11 @@
     </div>
   </div>
 
+  <script src="/vendor/xlsx.js"></script>
   <script>
     const ROWS_PER_RECORD = 3;
+    /** Avoid 304 on API GETs — fetch().ok is false for 304, so loaders would skip bodies. */
+    const FETCH_NO_CACHE = { cache: "no-store" };
     /** Aligns with Check Sheet entry grid (A–G only for saved results). */
     const SHEET_CHECK_CODES = "ABCDEFG".split("");
     const MONTH_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -263,8 +313,16 @@
 
     function fmtSheetDate(v) {
       if (v == null || v === "") return "";
-      const s = typeof v === "string" ? v : String(v);
-      return s.length >= 10 ? s.slice(0, 10) : "";
+      if (typeof v === "object" && v instanceof Date && !Number.isNaN(v.getTime())) {
+        const y = v.getUTCFullYear();
+        const mo = String(v.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(v.getUTCDate()).padStart(2, "0");
+        return `${y}-${mo}-${d}`;
+      }
+      const s = String(v).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+      const m = s.match(/(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : "";
     }
 
     function fmtSheetTime(v) {
@@ -299,11 +357,23 @@
       return "";
     }
 
+    function rowNumericOrTextFilled(v) {
+      if (v == null) return false;
+      if (typeof v === "number") return Number.isFinite(v);
+      return String(v).trim() !== "";
+    }
+
+    /** Match Check Sheet: any field that indicates the operator entered line data (not only checks / date). */
     function rowHasLineData(sr) {
       if (!sr) return false;
       const ck = checksObjectFromRow(sr);
-      if (sr.workDate && String(sr.workDate).trim() !== "") return true;
+      if (fmtSheetDate(sr.workDate)) return true;
       if (fmtSheetTime(sr.startTime) || fmtSheetTime(sr.finishTime)) return true;
+      if (rowNumericOrTextFilled(sr.qty) || rowNumericOrTextFilled(sr.okCount) || rowNumericOrTextFilled(sr.ngCount)) return true;
+      if (sr.machineNo != null && String(sr.machineNo).trim() !== "") return true;
+      if (sr.pic != null && String(sr.pic).trim() !== "") return true;
+      if (sr.sopCheck === true) return true;
+      if (sr.leaderCheck != null && String(sr.leaderCheck).trim() !== "") return true;
       for (const code of SHEET_CHECK_CODES) {
         if (String(ck[code] || "").trim() !== "") return true;
       }
@@ -445,7 +515,8 @@
       const p = String(partNo || "").trim();
       if (!p) return [];
       const res = await fetch(
-        `/api/references?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(p)}`
+        `/api/references?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(p)}`,
+        FETCH_NO_CACHE
       );
       if (!res.ok) return [];
       const data = await res.json();
@@ -469,14 +540,25 @@
     function buildMachineDayLines(processRows, y, m, partLabel, processName, pointChecks) {
       const partKey = String(partLabel || "").trim() || "—";
       const rules = getCheckRulesFromRefs(pointChecks || [], processName);
-      const sorted = [...(processRows || [])].sort((a, b) => (a.rowNo || 0) - (b.rowNo || 0));
+      const sorted = [...(processRows || [])].sort((a, b) => (Number(a.rowNo) || 0) - (Number(b.rowNo) || 0));
       const chunks = chunkRows(sorted);
       const out = new Map();
 
       for (const chunk of chunks) {
         if (!recordHasData(chunk)) continue;
         const head = chunk[0];
-        const wd = fmtSheetDate(head.workDate || (chunk[1] && chunk[1].workDate) || (chunk[2] && chunk[2].workDate));
+        let wd = "";
+        for (const row of chunk) {
+          const d = fmtSheetDate(row && row.workDate);
+          if (d && d.slice(0, 7) === ymKey(y, m)) {
+            wd = d;
+            break;
+          }
+        }
+        /* No work date in this calendar month: still show under day 1 (sheet is for eff month y/m). */
+        if (!wd && recordHasData(chunk)) {
+          wd = monthDateIso(y, m, 1);
+        }
         if (!wd || wd.slice(0, 7) !== ymKey(y, m)) continue;
 
         const machine = (head.machineNo != null && String(head.machineNo).trim() !== "")
@@ -504,7 +586,159 @@
       return out;
     }
 
-    const ALL_PROC_PREFIX = "allproc:";
+    const dchPartPick = {
+      partNoOptions: [],
+      partNamesByNo: {}
+    };
+    let dchProcessRows = [];
+    let dchProcessAllOptions = [];
+    let dchProcessFetchOk = false;
+
+    let syncingDchPartPickers = false;
+    function syncDchPartSelectsFromPartNo(partNo) {
+      syncingDchPartPickers = true;
+      const noEl = document.getElementById("partNo");
+      const p = String(partNo || "").trim();
+      if (noEl) noEl.value = p ? partNoDisplayLabel(p) : "";
+      syncingDchPartPickers = false;
+    }
+
+    /** Display string shown in Part No field: "PARTNO — Part name" (same idea as catalog). */
+    function partNoDisplayLabel(pn) {
+      const p = String(pn || "").trim();
+      if (!p) return "";
+      const name = String(dchPartPick.partNamesByNo[p] || "").trim();
+      return name && name.toUpperCase() !== p.toUpperCase() ? `${p} — ${name}` : p;
+    }
+
+    function normalizePartNoKey(s) {
+      let v = String(s || "").trim();
+      try {
+        v = v.normalize("NFKC");
+      } catch (_e) {
+        /* ignore */
+      }
+      v = v.replace(/[\u200B-\u200D\uFEFF]/g, "");
+      return v.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
+    }
+
+    function resolvePartNoInput(raw) {
+      const val = String(raw || "").trim();
+      if (!val) return "";
+      const opts = Array.isArray(dchPartPick.partNoOptions) ? dchPartPick.partNoOptions : [];
+      if (opts.length === 0) return "";
+
+      const valUp = val.toUpperCase();
+      const want = normalizePartNoKey(val);
+
+      const stripLabel = (s) => {
+        const t = String(s || "").trim();
+        const em = t.split(/\s*—\s*/);
+        if (em.length >= 2) return normalizePartNoKey(em[0]);
+        const hy = t.split(/\s*-\s*/);
+        if (hy.length >= 2) return normalizePartNoKey(hy[0]);
+        return normalizePartNoKey(t);
+      };
+
+      const legacyExact = opts.find((o) => String(o).trim().toUpperCase() === valUp);
+      if (legacyExact) return String(legacyExact).trim();
+
+      const normExact = opts.find((o) => normalizePartNoKey(o) === want);
+      if (normExact) return String(normExact).trim();
+
+      const labelExact = opts.find((o) => partNoDisplayLabel(o).toUpperCase() === valUp);
+      if (labelExact) return String(labelExact).trim();
+
+      const legacyPref = opts.filter((o) => String(o).trim().toUpperCase().startsWith(valUp));
+      if (legacyPref.length === 1) return String(legacyPref[0]).trim();
+
+      const normPref = want ? opts.filter((o) => normalizePartNoKey(o).startsWith(want)) : [];
+      if (normPref.length === 1) return String(normPref[0]).trim();
+
+      const wantFromLabel = stripLabel(val);
+      if (wantFromLabel) {
+        const byLabel = opts.filter((o) => normalizePartNoKey(o) === wantFromLabel);
+        if (byLabel.length === 1) return String(byLabel[0]).trim();
+        const prefLab = opts.filter((o) => normalizePartNoKey(o).startsWith(wantFromLabel));
+        if (prefLab.length === 1) return String(prefLab[0]).trim();
+      }
+
+      return "";
+    }
+
+    function fillDailyCheckPartPickers(parts) {
+      const noInput = document.getElementById("partNo");
+      const dl = document.getElementById("partNoDatalist");
+      dchPartPick.partNoOptions = [];
+      dchPartPick.partNamesByNo = {};
+      if (noInput) noInput.value = "";
+      if (dl) dl.replaceChildren();
+      for (const p of parts) {
+        const pn = String(p.partNo || "").trim();
+        if (!pn) continue;
+        const pnm = String(p.partName || "").trim() || pn;
+        dchPartPick.partNamesByNo[pn] = pnm;
+        dchPartPick.partNoOptions.push(pn);
+        if (dl) {
+          const d = document.createElement("option");
+          d.value = pn;
+          d.label = pnm && pnm.toUpperCase() !== pn.toUpperCase() ? `${pn} — ${pnm}` : pn;
+          dl.appendChild(d);
+        }
+      }
+    }
+
+    function processLabelFromValue(procVal) {
+      if (!procVal) return "ALL";
+      const id = Number(procVal);
+      if (Number.isFinite(id) && id >= 1) {
+        const hit = dchProcessRows.find((r) => Number(r.processMasterId) === id);
+        if (hit) return String(hit.processName || "").trim() || procVal;
+      }
+      const byAll = dchProcessAllOptions.find(
+        (o) => o.value === procVal || String(o.value).toUpperCase() === String(procVal).toUpperCase()
+      );
+      if (byAll) return String(byAll.label || byAll.value || procVal).trim() || procVal;
+      return String(procVal).trim();
+    }
+
+    function resolveProcessInput(raw, partCanon) {
+      const v = String(raw || "").trim();
+      if (!v || /^all$/i.test(v)) return "";
+      const key = partCanon ? normalizePartNoKey(partCanon) : "";
+      if (!key) {
+        for (const o of dchProcessAllOptions) {
+          if (o.value === v) return o.value;
+          if (String(o.label || "").toUpperCase() === v.toUpperCase()) return o.value;
+        }
+        const pref = dchProcessAllOptions.filter((o) =>
+          String(o.label || "").toUpperCase().startsWith(v.toUpperCase())
+        );
+        if (pref.length === 1) return pref[0].value;
+        const prefVal = dchProcessAllOptions.filter((o) =>
+          String(o.value || "").toUpperCase().startsWith(v.toUpperCase())
+        );
+        if (prefVal.length === 1) return prefVal[0].value;
+        return "";
+      }
+      const candidates = dchProcessRows.filter((r) => normalizePartNoKey(r.partNo) === key);
+      const num = Number(v);
+      if (Number.isFinite(num) && candidates.some((c) => Number(c.processMasterId) === num)) {
+        return String(num);
+      }
+      const exactName = candidates.filter(
+        (c) => String(c.processName || "").trim().toUpperCase() === v.toUpperCase()
+      );
+      if (exactName.length === 1) return String(exactName[0].processMasterId);
+      const pref = candidates.filter((c) =>
+        String(c.processName || "")
+          .trim()
+          .toUpperCase()
+          .startsWith(v.toUpperCase())
+      );
+      if (pref.length === 1) return String(pref[0].processMasterId);
+      return "";
+    }
 
     function mergeNestedMachinePartDay(into, from) {
       for (const [machine, partMap] of from) {
@@ -537,17 +771,25 @@
       );
     }
 
+    async function fetchPartsWithSheetsForMonth(formatId, effDate) {
+      const pr = await fetch(
+        `/api/checksheets/parts-for-month?formatId=${encodeURIComponent(formatId)}&effDate=${encodeURIComponent(effDate)}`,
+        FETCH_NO_CACHE
+      );
+      if (!pr.ok) throw new Error("Failed to load parts with sheets for month.");
+      return pr.json();
+    }
+
     async function buildMergedHistoryForProcessName(formatId, effDate, targetNorm, y, m) {
-      const pr = await fetch(`/api/formats/${formatId}/parts`);
-      if (!pr.ok) throw new Error("Failed to load part list.");
-      const parts = await pr.json();
+      const parts = await fetchPartsWithSheetsForMonth(formatId, effDate);
       const pchMap = await prefetchPointChecksByPart(formatId, parts);
       const merged = new Map();
       const tasks = (parts || []).map(async (row) => {
         const pno = String(row.partNo || "").trim();
         if (!pno) return;
         const res = await fetch(
-          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`,
+          FETCH_NO_CACHE
         );
         if (res.status === 404) return;
         if (!res.ok) return;
@@ -564,16 +806,15 @@
     }
 
     async function buildMergedHistoryAllPartsAllProcesses(formatId, effDate, y, m) {
-      const pr = await fetch(`/api/formats/${formatId}/parts`);
-      if (!pr.ok) throw new Error("Failed to load part list.");
-      const parts = await pr.json();
+      const parts = await fetchPartsWithSheetsForMonth(formatId, effDate);
       const pchMap = await prefetchPointChecksByPart(formatId, parts);
       const merged = new Map();
       const tasks = (parts || []).map(async (row) => {
         const pno = String(row.partNo || "").trim();
         if (!pno) return;
         const res = await fetch(
-          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(pno)}&effDate=${encodeURIComponent(effDate)}`,
+          FETCH_NO_CACHE
         );
         if (res.status === 404) return;
         if (!res.ok) return;
@@ -613,9 +854,46 @@
       return `<td><a class="dch-part-link" href="${escapeHtml(href)}">${escapeHtml(raw)}</a></td>`;
     }
 
+    /** @returns {Promise<Map<string, number>>} UPPER(trim(machine_no)) -> display_order */
+    async function loadMachineOrderMap() {
+      const m = new Map();
+      try {
+        const res = await fetch("/api/machines?forSort=1", FETCH_NO_CACHE);
+        if (!res.ok) return m;
+        const rows = await res.json();
+        for (const r of rows || []) {
+          const k = String(r.machineNo || "").trim().toUpperCase();
+          if (!k) continue;
+          m.set(k, Number(r.displayOrder) || 0);
+        }
+      } catch (_e) {
+        /* ignore */
+      }
+      return m;
+    }
+
+    function compareMachineNoForHistory(a, b, orderByNo) {
+      const na = String(a || "").trim();
+      const nb = String(b || "").trim();
+      const ua = na.toUpperCase();
+      const ub = nb.toUpperCase();
+      const ha = orderByNo && orderByNo.has(ua);
+      const hb = orderByNo && orderByNo.has(ub);
+      if (ha && hb) {
+        const da = orderByNo.get(ua);
+        const db = orderByNo.get(ub);
+        if (da !== db) return da - db;
+        return na.localeCompare(nb, "en");
+      }
+      if (ha) return -1;
+      if (hb) return 1;
+      return na.localeCompare(nb, "en");
+    }
+
     /** @param nestedMap Map<machine, Map<part, Map<dayIso, cell>>> */
-    function renderTable(y, m, nestedMap, formatId) {
-      const machines = [...nestedMap.keys()].sort((a, b) => a.localeCompare(b, "en"));
+    /** @param orderByNo Map<string, number> | null */
+    function renderTable(y, m, nestedMap, formatId, orderByNo) {
+      const machines = [...nestedMap.keys()].sort((a, b) => compareMachineNoForHistory(a, b, orderByNo));
       if (machines.length === 0) {
         return "<p class=\"muted\" style=\"padding:12px;margin:0;\">No data to display. Check month, filters, and saved sheets.</p>";
       }
@@ -679,52 +957,82 @@
     }
 
     async function loadFormats(sel) {
-      const res = await fetch("/api/formats");
+      const res = await fetch("/api/formats", FETCH_NO_CACHE);
       const data = await res.json();
       sel.innerHTML = data.map((f) =>
         `<option value="${f.formatId}">${escapeHtml(f.formatCode)} — ${escapeHtml(f.formatName)}</option>`
       ).join("");
+      const list = Array.isArray(data) ? data : [];
+      sel.disabled = list.length <= 1;
     }
 
-    async function loadParts(formatId, partSel) {
-      const res = await fetch(`/api/formats/${formatId}/parts`);
-      if (!res.ok) {
-        partSel.innerHTML = `<option value="" selected>ALL</option>`;
-        return;
-      }
+    async function loadParts(formatId) {
+      fillDailyCheckPartPickers([]);
+      if (!formatId) return;
+      const res = await fetch(`/api/formats/${formatId}/parts`, FETCH_NO_CACHE);
+      if (!res.ok) return;
       const data = await res.json();
-      const opts = (data || []).map((p) => {
-        const no = escapeHtml(p.partNo);
-        return `<option value="${no}">${no} — ${escapeHtml(p.partName || "")}</option>`;
-      });
-      partSel.innerHTML = `<option value="" selected>ALL</option>${opts.join("")}`;
+      fillDailyCheckPartPickers(Array.isArray(data) ? data : []);
     }
 
-    async function loadProcesses(formatId, partNo, procSel) {
-      const lead = `<option value="" selected>ALL</option>`;
-      const q = partNo ? `?partNo=${encodeURIComponent(partNo)}` : "";
-      const res = await fetch(`/api/formats/${formatId}/processes${q}`);
-      if (!res.ok) {
-        procSel.innerHTML = lead;
+    async function loadProcesses(formatId, partNoRaw) {
+      const procInput = document.getElementById("process");
+      const procDl = document.getElementById("processDatalist");
+      dchProcessFetchOk = false;
+      dchProcessRows = [];
+      dchProcessAllOptions = [];
+      if (procInput) procInput.value = "";
+      if (procDl) procDl.replaceChildren();
+      if (!formatId) {
+        dchProcessFetchOk = true;
         return;
       }
+
+      const partCanon = resolvePartNoInput(String(partNoRaw || "").trim());
+      const q = partCanon ? `?partNo=${encodeURIComponent(partCanon)}` : "";
+      const res = await fetch(`/api/formats/${formatId}/processes${q}`, FETCH_NO_CACHE);
+      if (!res.ok) {
+        if (procDl) {
+          procDl.replaceChildren();
+          const ao = document.createElement("option");
+          ao.value = "";
+          ao.label = "ALL";
+          procDl.appendChild(ao);
+        }
+        dchProcessFetchOk = true;
+        return;
+      }
+
+      dchProcessFetchOk = true;
       const data = await res.json();
       const rows = [...(data || [])].sort((a, b) => {
         const pa = String(a.partNo || "").localeCompare(String(b.partNo || ""), "en");
         if (pa !== 0) return pa;
         return (a.displayOrder || 0) - (b.displayOrder || 0);
       });
-      if (partNo) {
-        procSel.innerHTML =
-          lead +
-          rows
-            .map((p) => {
-              const pno = escapeHtml(p.partNo || "");
-              return `<option value="${p.processMasterId}" data-part-no="${pno}">${escapeHtml(p.processName)}</option>`;
-            })
-            .join("");
+
+      const allOpt = document.createElement("option");
+      allOpt.value = "";
+      allOpt.label = "ALL";
+      if (procDl) procDl.appendChild(allOpt);
+
+      if (partCanon) {
+        dchProcessRows = rows.map((p) => ({
+          processMasterId: p.processMasterId,
+          processName: String(p.processName || "").trim(),
+          partNo: String(p.partNo || "").trim()
+        }));
+        for (const p of dchProcessRows) {
+          if (!p.processName) continue;
+          const o = document.createElement("option");
+          o.value = p.processName;
+          o.label = p.partNo ? `${p.processName}` : p.processName;
+          if (procDl) procDl.appendChild(o);
+        }
         return;
       }
+
+      dchProcessRows = [];
       const byNorm = new Map();
       for (const p of rows) {
         const raw = String(p.processName || "").trim();
@@ -733,14 +1041,13 @@
         if (!byNorm.has(k)) byNorm.set(k, raw);
       }
       const names = [...byNorm.keys()].sort().map((k) => byNorm.get(k));
-      procSel.innerHTML =
-        lead +
-        names
-          .map((name) => {
-            const enc = encodeURIComponent(name.toUpperCase());
-            return `<option value="${ALL_PROC_PREFIX}${enc}">${escapeHtml(name)}</option>`;
-          })
-          .join("");
+      for (const name of names) {
+        dchProcessAllOptions.push({ value: name, label: name });
+        const o = document.createElement("option");
+        o.value = name;
+        o.label = name;
+        if (procDl) procDl.appendChild(o);
+      }
     }
 
     function initYearMonth() {
@@ -757,6 +1064,48 @@
       mSel.value = pad2(new Date().getMonth() + 1);
     }
 
+    function updateExportButtonState() {
+      const btn = document.getElementById("exportBtn");
+      if (!btn) return;
+      btn.disabled = !document.querySelector("#tableHost table.dch");
+    }
+
+    function sanitizeExportFilename(s) {
+      return String(s || "export")
+        .replace(/[/\\?%*:|"<>]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 100) || "export";
+    }
+
+    function safeExcelSheetName(s) {
+      let x = String(s || "MonthlyHistory").replace(/[:\\/?*[\]]/g, "-").slice(0, 31);
+      if (!x.trim()) x = "MonthlyHistory";
+      return x;
+    }
+
+    function exportMonthlyTableToExcel() {
+      const errEl = document.getElementById("err");
+      if (typeof XLSX === "undefined" || !XLSX.utils || !XLSX.utils.table_to_sheet) {
+        errEl.textContent = "Excel export library did not load. Check your network and try again.";
+        return;
+      }
+      const table = document.querySelector("#tableHost table.dch");
+      if (!table) {
+        errEl.textContent = "No table to export. Load data first.";
+        return;
+      }
+      errEl.textContent = "";
+      const ws = XLSX.utils.table_to_sheet(table, { raw: true });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, safeExcelSheetName("MonthlyHistory"));
+      const y = document.getElementById("effYear").value;
+      const mo = document.getElementById("effMonth").value;
+      const title = document.getElementById("titleMonth").textContent.trim();
+      const base = `${sanitizeExportFilename(title || `QCCheck-MonthlyHistory-${y}-${mo}`)}.xlsx`;
+      XLSX.writeFile(wb, base);
+    }
+
     async function runLoad() {
       const errEl = document.getElementById("err");
       const host = document.getElementById("tableHost");
@@ -764,48 +1113,57 @@
       errEl.textContent = "";
       host.innerHTML = "";
       titleEl.textContent = "";
+      updateExportButtonState();
 
-      const formatId = Number(document.getElementById("format").value);
-      const partNoFilter = String(document.getElementById("partNo").value || "").trim();
+      try {
+        const formatId = Number(document.getElementById("format").value);
+      const partNoFilter = resolvePartNoInput(document.getElementById("partNo").value);
       const y = Number(document.getElementById("effYear").value);
       const m = Number(document.getElementById("effMonth").value);
-      const procVal = document.getElementById("process").value;
+      const procRaw = String(document.getElementById("process").value || "").trim();
+      const procVal = resolveProcessInput(procRaw, partNoFilter);
       const effDate = `${y}-${pad2(m)}-01`;
 
-      const procSel = document.getElementById("process");
-      const procOpt = procSel.selectedOptions[0];
       const processIsAll = procVal === "";
-      const isAllByProcessName = !partNoFilter && !processIsAll && procVal.startsWith(ALL_PROC_PREFIX);
+      const procValUp = String(procVal).trim().toUpperCase();
+      const isAllByProcessName =
+        !partNoFilter &&
+        !processIsAll &&
+        procValUp !== "" &&
+        dchProcessAllOptions.some((o) => String(o.value || "").trim().toUpperCase() === procValUp);
 
       if (!formatId) {
         errEl.textContent = "Select a format.";
         return;
       }
-      if (procSel.options.length === 0) {
+      if (!dchProcessFetchOk) {
         errEl.textContent = "No process list could be loaded.";
         return;
       }
 
-      const procLabel = procOpt ? procOpt.textContent.trim() : "ALL";
+      const procLabel = processLabelFromValue(procVal);
       const mt = monthTitleEn(y, m);
 
       try {
+        const machineOrderByNo = await loadMachineOrderMap();
+
         if (!partNoFilter && processIsAll) {
           titleEl.textContent = `${mt} — All parts · All processes (by machine)`;
           const machineDayMap = await buildMergedHistoryAllPartsAllProcesses(formatId, effDate, y, m);
           if (machineDayMap.size === 0) {
             errEl.textContent =
-              "No rows matched (no saved sheets for that month, or no work date / machine / check data in lines).";
+              "No rows matched: no saved checksheets for this format and month, or no displayable line data (work date, machine, qty, checks, etc.) on those sheets.";
             return;
           }
-          host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+          host.innerHTML = renderTable(y, m, machineDayMap, formatId, machineOrderByNo);
           return;
         }
 
         if (partNoFilter && processIsAll) {
           titleEl.textContent = `${mt} — All processes (Part ${partNoFilter} · by machine)`;
           const sheetRes = await fetch(
-            `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoFilter)}&effDate=${encodeURIComponent(effDate)}`
+            `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoFilter)}&effDate=${encodeURIComponent(effDate)}`,
+            FETCH_NO_CACHE
           );
           if (sheetRes.status === 404) {
             errEl.textContent = "No saved sheet for this part and month. Load and save it on the entry screen first.";
@@ -830,12 +1188,12 @@
             errEl.textContent = "This sheet has no displayable history rows.";
             return;
           }
-          host.innerHTML = renderTable(y, m, merged, formatId);
+          host.innerHTML = renderTable(y, m, merged, formatId, machineOrderByNo);
           return;
         }
 
         if (isAllByProcessName) {
-          const targetNorm = decodeURIComponent(procVal.slice(ALL_PROC_PREFIX.length)).toUpperCase();
+          const targetNorm = String(procVal).trim().toUpperCase();
           titleEl.textContent = `${mt} — All parts · ${procLabel} (by process name · by machine)`;
           const machineDayMap = await buildMergedHistoryForProcessName(formatId, effDate, targetNorm, y, m);
           if (machineDayMap.size === 0) {
@@ -843,7 +1201,7 @@
               "No rows matched across parts (no sheets, process name mismatch, or no date / machine / check data).";
             return;
           }
-          host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+          host.innerHTML = renderTable(y, m, machineDayMap, formatId, machineOrderByNo);
           return;
         }
 
@@ -852,8 +1210,7 @@
           errEl.textContent = "Invalid process selection.";
           return;
         }
-        const partNoFromProcess = String(procOpt.getAttribute("data-part-no") || "").trim();
-        const partNoForSheet = partNoFilter || partNoFromProcess;
+        const partNoForSheet = partNoFilter;
         if (!partNoForSheet) {
           errEl.textContent = "Select a part, or with Part ALL choose a process name.";
           return;
@@ -862,7 +1219,8 @@
         titleEl.textContent = `${mt} — ${procLabel} (Part ${partNoForSheet})`;
 
         const sheetRes = await fetch(
-          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoForSheet)}&effDate=${encodeURIComponent(effDate)}`
+          `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNoForSheet)}&effDate=${encodeURIComponent(effDate)}`,
+          FETCH_NO_CACHE
         );
 
         if (sheetRes.status === 404) {
@@ -891,37 +1249,114 @@
           proc.processName,
           pointChecks
         );
-        host.innerHTML = renderTable(y, m, machineDayMap, formatId);
+        host.innerHTML = renderTable(y, m, machineDayMap, formatId, machineOrderByNo);
       } catch (e) {
         errEl.textContent = String(e && e.message ? e.message : e);
+      }
+      } finally {
+        updateExportButtonState();
       }
     }
 
     document.getElementById("format").addEventListener("change", async () => {
       const fid = document.getElementById("format").value;
-      await loadParts(fid, document.getElementById("partNo"));
-      const partNo = document.getElementById("partNo").value;
-      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+      await loadParts(fid);
+      const partRaw = document.getElementById("partNo").value;
+      if (fid) await loadProcesses(fid, partRaw);
     });
 
-    document.getElementById("partNo").addEventListener("change", async () => {
+    const dchPartNoEl = document.getElementById("partNo");
+    dchPartNoEl.addEventListener("change", async () => {
+      if (syncingDchPartPickers) return;
+      const resolved = resolvePartNoInput(dchPartNoEl.value);
+      if (resolved) syncDchPartSelectsFromPartNo(resolved);
       const fid = document.getElementById("format").value;
-      const partNo = document.getElementById("partNo").value;
-      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+      if (fid) await loadProcesses(fid, resolved || dchPartNoEl.value);
+    });
+    dchPartNoEl.addEventListener("blur", () => {
+      dchPartNoEl.dispatchEvent(new Event("change"));
+    });
+    dchPartNoEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        dchPartNoEl.dispatchEvent(new Event("change"));
+      }
     });
 
     document.getElementById("loadBtn").addEventListener("click", () => {
       runActionWithButtonFeedback("loadBtn", runLoad);
     });
 
+    document.getElementById("exportBtn").addEventListener("click", async () => {
+      await runActionWithButtonFeedback("exportBtn", async () => {
+        exportMonthlyTableToExcel();
+      });
+      updateExportButtonState();
+    });
+
     (async function init() {
       initYearMonth();
+      const qs = new URLSearchParams(window.location.search || "");
       const fmt = document.getElementById("format");
       await loadFormats(fmt);
+
+      const qFid = qs.get("formatId");
+      if (qFid) {
+        const s = String(qFid).trim();
+        for (const o of fmt.options) {
+          if (o.value === s) {
+            fmt.value = s;
+            break;
+          }
+        }
+      }
+
+      const ySel = document.getElementById("effYear");
+      const mSel = document.getElementById("effMonth");
+      const qy = qs.get("effYear");
+      if (qy) {
+        const ys = String(qy).trim();
+        for (const o of ySel.options) {
+          if (o.value === ys) {
+            ySel.value = ys;
+            break;
+          }
+        }
+      }
+      const qm = qs.get("effMonth");
+      if (qm != null && String(qm).trim() !== "") {
+        const mn = Number(String(qm).trim());
+        if (Number.isFinite(mn) && mn >= 1 && mn <= 12) mSel.value = pad2(mn);
+      }
+
       const fid = fmt.value;
-      await loadParts(fid, document.getElementById("partNo"));
-      const partNo = document.getElementById("partNo").value;
-      if (fid) await loadProcesses(fid, partNo, document.getElementById("process"));
+      const pnSel = document.getElementById("partNo");
+      await loadParts(fid);
+
+      if (qs.has("partNo")) {
+        const raw = String(qs.get("partNo") ?? "").trim();
+        if (raw === "" || /^all$/i.test(raw)) {
+          pnSel.value = "";
+        } else {
+          pnSel.value = raw;
+          const resolved = resolvePartNoInput(pnSel.value);
+          if (resolved) syncDchPartSelectsFromPartNo(resolved);
+        }
+      }
+
+      const partNoRaw = pnSel.value;
+      if (fid) await loadProcesses(fid, partNoRaw);
+
+      const qProc = qs.get("processId") || qs.get("process");
+      if (qProc != null && String(qProc).trim() !== "") {
+        const want = String(qProc).trim();
+        document.getElementById("process").value = /^all$/i.test(want) ? "" : want;
+      }
+
+      if (qs.get("load") === "1" || qs.get("auto") === "1") {
+        await runLoad();
+      }
+      updateExportButtonState();
     })();
   </script>
 </body>

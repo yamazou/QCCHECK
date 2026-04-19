@@ -326,7 +326,7 @@
           </div>
         </div>
         <p class="sub">
-          <a href="/">QC Check</a>
+          <a id="checkSheetLink" href="/">QC Check</a>
           <span aria-hidden="true"> · </span>
           <a href="/daily-check-history.html">Monthly History</a>
           <span aria-hidden="true"> · </span>
@@ -364,6 +364,22 @@
     </div>
     <div id="brandingMsg" class="err" style="display:none;"></div>
     <div id="brandingOk" class="ok" style="display:none;"></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px;">
+    <h2>Machine master</h2>
+    <p class="muted">Checklist Machine No field uses these rows as suggestions, ordered by Display order.</p>
+    <div id="machineMsg" class="err" style="display:none;"></div>
+    <table id="machineTable">
+      <thead><tr><th>Machine No</th><th>Machine name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:8px;">
+      <div><label>New machine no</label><input id="newMachineNo" placeholder="e.g. M-01" style="width:120px;" maxlength="100" /></div>
+      <div><label>New machine name</label><input id="newMachineName" placeholder="e.g. Press 200T" style="width:220px;" maxlength="200" /></div>
+      <button type="button" id="btnAddMachine">Add machine</button>
+      <button type="button" id="btnReloadMachines">Reload machines</button>
+    </div>
   </div>
 
   <div class="grid2">
@@ -535,6 +551,7 @@
       const okEl = document.getElementById("detailOk");
       if (okEl) okEl.style.display = "none";
       if (catalogErrMsg !== undefined) showErr("catalogMsg", catalogErrMsg);
+      updateCheckSheetHref();
     }
 
     function flashButtonPress(btn) {
@@ -570,45 +587,129 @@
       }
     }
 
+    let machineRows = [];
+
+    async function loadMachines() {
+      showErr("machineMsg", "");
+      const res = await fetch("/api/admin/machines");
+      const data = await res.json().catch(() => ([]));
+      if (!res.ok) {
+        machineRows = [];
+        renderMachineTable();
+        showErr("machineMsg", data.message || JSON.stringify(data));
+        return;
+      }
+      machineRows = Array.isArray(data) ? data : [];
+      renderMachineTable();
+    }
+
+    function renderMachineTable() {
+      const tb = document.querySelector("#machineTable tbody");
+      if (!tb) return;
+      tb.innerHTML = machineRows.map((m) => {
+        const id = Number(m.machineMasterId);
+        const noEsc = escapeHtml(String(m.machineNo || ""));
+        const nameEsc = escapeHtml(String(m.machineName || ""));
+        return `<tr data-mid="${id}">
+          <td><input class="mm-no" value="${noEsc}" style="width:100%;max-width:140px;" maxlength="100" /></td>
+          <td><input class="mm-name" value="${nameEsc}" style="width:100%;max-width:260px;" maxlength="200" /></td>
+          <td><input class="mm-ord" type="number" min="0" step="1" value="${Number(m.displayOrder) || 0}" style="width:72px;" /></td>
+          <td><input class="mm-act" type="checkbox" ${m.activeFlag ? "checked" : ""} /></td>
+          <td class="row-actions">
+            <button type="button" class="btn-mm-save">Save</button>
+            <button type="button" class="btn-mm-del btn-del">Delete</button>
+          </td>
+        </tr>`;
+      }).join("");
+      tb.querySelectorAll(".btn-mm-save").forEach((btn) => {
+        btn.onclick = () => {
+          const tr = btn.closest("tr");
+          if (!tr) return;
+          runActionWithButtonFeedback(btn, async () => {
+            const mid = Number(tr.dataset.mid);
+            const machineNo = tr.querySelector(".mm-no")?.value ?? "";
+            const machineName = tr.querySelector(".mm-name")?.value ?? "";
+            const displayOrder = tr.querySelector(".mm-ord")?.value ?? "";
+            const activeFlag = !!tr.querySelector(".mm-act")?.checked;
+            const res = await fetch(`/api/admin/machines/${encodeURIComponent(mid)}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ machineNo, machineName, displayOrder, activeFlag })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              showErr("machineMsg", data.message || res.status);
+              return;
+            }
+            await loadMachines();
+          });
+        };
+      });
+      tb.querySelectorAll(".btn-mm-del").forEach((btn) => {
+        btn.onclick = () => {
+          const tr = btn.closest("tr");
+          if (!tr) return;
+          const mid = Number(tr.dataset.mid);
+          if (!mid || !window.confirm("Delete this machine row?")) return;
+          runActionWithButtonFeedback(btn, async () => {
+            const res = await fetch(`/api/admin/machines/${encodeURIComponent(mid)}`, { method: "DELETE" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              showErr("machineMsg", data.message || res.status);
+              return;
+            }
+            await loadMachines();
+          });
+        };
+      });
+    }
+
     async function loadCatalog() {
       showErr("catalogMsg", "");
-      if (!formatId) return;
-      const res = await fetch(`/api/admin/catalog?formatId=${encodeURIComponent(formatId)}`);
-      const data = await res.json();
-      if (!res.ok) {
-        showErr("catalogMsg", data.message || JSON.stringify(data));
+      if (!formatId) {
+        updateCheckSheetHref();
         return;
       }
-      catalogParts = data.parts || [];
-      partNoOptions = catalogParts.map((p) => p.partNo);
-      const partsInput = document.getElementById("partsSelect");
-      const dl = document.getElementById("partsNoDatalist");
-      if (dl) {
-        dl.replaceChildren();
-        for (const p of catalogParts) {
-          const d = document.createElement("option");
-          d.value = p.partNo;
-          d.label = formatCatalogDatalistLabel(p);
-          dl.appendChild(d);
+      try {
+        const res = await fetch(`/api/admin/catalog?formatId=${encodeURIComponent(formatId)}`);
+        const data = await res.json();
+        if (!res.ok) {
+          showErr("catalogMsg", data.message || JSON.stringify(data));
+          return;
         }
-      }
+        catalogParts = data.parts || [];
+        partNoOptions = catalogParts.map((p) => p.partNo);
+        const partsInput = document.getElementById("partsSelect");
+        const dl = document.getElementById("partsNoDatalist");
+        if (dl) {
+          dl.replaceChildren();
+          for (const p of catalogParts) {
+            const d = document.createElement("option");
+            d.value = p.partNo;
+            d.label = formatCatalogDatalistLabel(p);
+            dl.appendChild(d);
+          }
+        }
 
-      if (!catalogParts.length) {
-        selectedPart = null;
-        if (partsInput) partsInput.value = "";
+        if (!catalogParts.length) {
+          selectedPart = null;
+          if (partsInput) partsInput.value = "";
+          updatePartsSummary();
+          return;
+        }
+
+        const hasCurrent = selectedPart && catalogParts.some((p) => p.partNo === selectedPart);
+        if (hasCurrent && partsInput) {
+          const cur = catalogParts.find((p) => p.partNo === selectedPart);
+          partsInput.value = cur ? formatRegisteredPartLabel(cur) : selectedPart;
+        } else {
+          selectedPart = null;
+          if (partsInput) partsInput.value = "";
+        }
         updatePartsSummary();
-        return;
+      } finally {
+        updateCheckSheetHref();
       }
-
-      const hasCurrent = selectedPart && catalogParts.some((p) => p.partNo === selectedPart);
-      if (hasCurrent && partsInput) {
-        const cur = catalogParts.find((p) => p.partNo === selectedPart);
-        partsInput.value = cur ? formatRegisteredPartLabel(cur) : selectedPart;
-      } else {
-        selectedPart = null;
-        if (partsInput) partsInput.value = "";
-      }
-      updatePartsSummary();
     }
 
     async function loadHeaderBranding() {
@@ -628,6 +729,17 @@
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
+    /** Deep link to Check Sheet with current format + catalog part (when Open / resolved in Parts). */
+    function updateCheckSheetHref() {
+      const a = document.getElementById("checkSheetLink");
+      if (!a) return;
+      if (!formatId || !selectedPart) {
+        a.href = "/";
+        return;
+      }
+      a.href = `/?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(selectedPart)}`;
     }
 
     /**
@@ -765,6 +877,7 @@
       showErr("detailOk", "");
       document.getElementById("detailOk").style.display = "none";
       await refreshDetail();
+      updateCheckSheetHref();
     }
 
     function getSelectedCatalogPartNo() {
@@ -1014,6 +1127,7 @@
       formatId = Number(document.getElementById("formatSel").value);
       selectedPart = null;
       document.getElementById("detailPanel").style.display = "none";
+      updateCheckSheetHref();
       loadHeaderBranding();
       loadCatalog();
     };
@@ -1028,18 +1142,21 @@
         selectedPart = null;
         document.getElementById("detailPanel").style.display = "none";
         updatePartsSummary();
+        updateCheckSheetHref();
         return;
       }
       const resolved = resolvePartNoInput(partsSelectInputEl.value);
       if (!resolved) {
         resetMasterDetailClosed("");
         updatePartsSummary();
+        updateCheckSheetHref();
         return;
       }
       selectedPart = resolved;
       const p = catalogParts.find((x) => x.partNo === resolved);
       partsSelectInputEl.value = p ? formatRegisteredPartLabel(p) : resolved;
       updatePartsSummary();
+      updateCheckSheetHref();
     };
     partsSelectInputEl.addEventListener("blur", () => {
       partsSelectInputEl.dispatchEvent(new Event("change"));
@@ -1245,12 +1362,80 @@
       });
     };
 
+    document.getElementById("btnReloadMachines").onclick = () => {
+      runActionWithButtonFeedback("btnReloadMachines", loadMachines);
+    };
+    document.getElementById("btnAddMachine").onclick = () => {
+      runActionWithButtonFeedback("btnAddMachine", async () => {
+        const machineNo = document.getElementById("newMachineNo").value.trim();
+        const machineName = document.getElementById("newMachineName").value.trim();
+        if (!machineNo || !machineName) {
+          showErr("machineMsg", "Machine no and machine name are required.");
+          return;
+        }
+        const res = await fetch("/api/admin/machines", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineNo, machineName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showErr("machineMsg", data.message || res.status);
+          return;
+        }
+        document.getElementById("newMachineNo").value = "";
+        document.getElementById("newMachineName").value = "";
+        await loadMachines();
+      });
+    };
+
+    function readAdminOpenQuery() {
+      let partNo = "";
+      let formatIdFromUrl = null;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        partNo = String(params.get("partNo") || "").trim();
+        const raw = params.get("formatId");
+        if (raw != null && String(raw).trim() !== "") {
+          const n = Number(raw);
+          if (Number.isFinite(n) && n > 0) formatIdFromUrl = n;
+        }
+      } catch (_e) {
+        /* ignore */
+      }
+      return { partNo, formatIdFromUrl };
+    }
+
     (async () => {
       bindFilePicker("brandLogoFile", "pickBrandLogoFile", "brandLogoFileName");
       bindFilePicker("drFile", "pickDrFile", "drFileName");
+      const openQ = readAdminOpenQuery();
       await loadFormats();
+      await loadMachines();
+      if (
+        openQ.formatIdFromUrl != null &&
+        Array.isArray(formats) &&
+        formats.some((f) => Number(f.formatId) === openQ.formatIdFromUrl)
+      ) {
+        formatId = openQ.formatIdFromUrl;
+        const fmtSel = document.getElementById("formatSel");
+        if (fmtSel) fmtSel.value = String(formatId);
+      }
       await loadHeaderBranding();
       await loadCatalog();
+      if (openQ.partNo && formatId) {
+        const resolved = resolvePartNoInput(openQ.partNo) || openQ.partNo;
+        const found = catalogParts.some((p) => p.partNo === resolved);
+        if (found) {
+          showErr("catalogMsg", "");
+          await openPart(resolved);
+        } else {
+          showErr(
+            "catalogMsg",
+            `Part "${openQ.partNo}" was not found for the selected format. Choose the part from the list and Open.`
+          );
+        }
+      }
     })();
   </script>
 </body>

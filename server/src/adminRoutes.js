@@ -4,10 +4,37 @@
 
 function registerAdminRoutes(app, sql, getPool) {
   function normalizePartNo(input) {
-    return String(input || "")
-      .trim()
-      .toUpperCase()
-      .replaceAll(/\s+/g, "");
+    let s = String(input || "").trim();
+    try {
+      s = s.normalize("NFKC");
+    } catch (_e) {
+      /* ignore */
+    }
+    s = s.replace(/[\u200B-\u200D\uFEFF]/g, "");
+    return s.replace(/\s+/g, "").replace(/-/g, "").toUpperCase();
+  }
+
+  /**
+   * SQL expression matching normalizePartNo for ASCII-ish part numbers:
+   * trim, remove tab/space/hyphen, uppercase. Use with @partNo already normalized in Node.
+   */
+  function sqlNormalizedPartNoExpr(tableAlias, colName = "part_no") {
+    return (
+      `UPPER(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(${tableAlias}.${colName}, N''))), ` +
+      `CHAR(9), N''), N' ', N''), N'-', N''))`
+    );
+  }
+
+  /** Map mssql rows so res.json never hits bigint serialization errors. */
+  function rowsForJson(recordset) {
+    const rows = Array.isArray(recordset) ? recordset : [];
+    return rows.map((r) => {
+      const o = {};
+      for (const [k, v] of Object.entries(r)) {
+        o[k] = typeof v === "bigint" ? String(v) : v;
+      }
+      return o;
+    });
   }
 
   async function nextProcessDisplayOrder(pool, formatId, partNo) {
@@ -231,10 +258,10 @@ function registerAdminRoutes(app, sql, getPool) {
           FROM dbo.drawing_reference dr
           LEFT JOIN dbo.process_master fpm
             ON fpm.format_id = dr.format_id
-            AND fpm.part_no = dr.part_no
+            AND ${sqlNormalizedPartNoExpr("fpm")} = @partNo
             AND dr.process_code IS NOT NULL
             AND fpm.process_name = dr.process_code
-          WHERE dr.format_id = @formatId AND dr.part_no = @partNo
+          WHERE dr.format_id = @formatId AND ${sqlNormalizedPartNoExpr("dr")} = @partNo
           ORDER BY
             CASE WHEN dr.process_code IS NULL THEN 0 ELSE 1 END,
             CASE WHEN dr.process_code IS NULL THEN 0 ELSE COALESCE(fpm.display_order, 2147483646) END,
@@ -255,10 +282,10 @@ function registerAdminRoutes(app, sql, getPool) {
             FROM dbo.point_check_reference pcr
             LEFT JOIN dbo.process_master fpm
               ON fpm.format_id = pcr.format_id
-              AND fpm.part_no = pcr.part_no
+              AND ${sqlNormalizedPartNoExpr("fpm")} = @partNo
               AND pcr.process_code IS NOT NULL
               AND fpm.process_name = pcr.process_code
-            WHERE pcr.format_id = @formatId AND pcr.part_no = @partNo
+            WHERE pcr.format_id = @formatId AND ${sqlNormalizedPartNoExpr("pcr")} = @partNo
             ORDER BY
               CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(pcr.process_code, N''))), N'') IS NULL THEN 1 ELSE 0 END,
               CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(pcr.process_code, N''))), N'') IS NULL
@@ -278,10 +305,10 @@ function registerAdminRoutes(app, sql, getPool) {
             FROM dbo.point_check_reference pcr
             LEFT JOIN dbo.process_master fpm
               ON fpm.format_id = pcr.format_id
-              AND fpm.part_no = pcr.part_no
+              AND ${sqlNormalizedPartNoExpr("fpm")} = @partNo
               AND pcr.process_code IS NOT NULL
               AND fpm.process_name = pcr.process_code
-            WHERE pcr.format_id = @formatId AND pcr.part_no = @partNo
+            WHERE pcr.format_id = @formatId AND ${sqlNormalizedPartNoExpr("pcr")} = @partNo
             ORDER BY
               CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(pcr.process_code, N''))), N'') IS NULL THEN 1 ELSE 0 END,
               CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(pcr.process_code, N''))), N'') IS NULL
@@ -296,16 +323,16 @@ function registerAdminRoutes(app, sql, getPool) {
         .input("partNo", sql.NVarChar(100), partNo)
         .query(`
           SELECT customer_abbrev AS customerAbbrev
-          FROM dbo.part_customer
-          WHERE format_id = @formatId AND part_no = @partNo AND active_flag = 1
+          FROM dbo.part_customer pcust
+          WHERE pcust.format_id = @formatId AND ${sqlNormalizedPartNoExpr("pcust")} = @partNo AND pcust.active_flag = 1
         `);
       const customerAbbrev =
         cust.recordset.length && cust.recordset[0].customerAbbrev != null
           ? String(cust.recordset[0].customerAbbrev).trim()
           : null;
       res.json({
-        drawings: dr.recordset,
-        pointChecks: pc.recordset,
+        drawings: rowsForJson(dr.recordset),
+        pointChecks: rowsForJson(pc.recordset),
         customerAbbrev: customerAbbrev || null
       });
     } catch (e) {
@@ -1022,6 +1049,152 @@ function registerAdminRoutes(app, sql, getPool) {
         return res.json({ ok: true, created: true });
       }
       res.json({ ok: true, created: false });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  function normalizeMachineNo(input) {
+    return String(input || "").trim().slice(0, 100);
+  }
+
+  async function nextMachineDisplayOrder(pool) {
+    const rs = await pool.request().query(`
+      IF OBJECT_ID('dbo.machine_master', 'U') IS NULL SELECT 1 AS n
+      ELSE SELECT ISNULL(MAX(display_order), 0) + 1 AS n FROM dbo.machine_master
+    `);
+    return rs.recordset[0].n;
+  }
+
+  /** List all machines (admin); requires sql/332_machine_master.sql */
+  app.get("/api/admin/machines", async (_req, res) => {
+    try {
+      const pool = await getPool();
+      const rs = await pool.request().query(`
+        IF OBJECT_ID('dbo.machine_master', 'U') IS NULL
+        BEGIN
+          THROW 50001, 'machine_master table not found. Run sql/332_machine_master.sql first.', 1;
+        END
+        SELECT machine_master_id AS machineMasterId, machine_no AS machineNo, machine_name AS machineName,
+               display_order AS displayOrder, active_flag AS activeFlag
+        FROM dbo.machine_master
+        ORDER BY display_order, machine_no
+      `);
+      res.json(rs.recordset);
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/machines", async (req, res) => {
+    const { machineNo, machineName, displayOrder } = req.body || {};
+    const no = normalizeMachineNo(machineNo);
+    const name = String(machineName || "").trim().slice(0, 200);
+    if (!no || !name) {
+      return res.status(400).json({ message: "machineNo and machineName are required" });
+    }
+    try {
+      const pool = await getPool();
+      let ord = displayOrder != null && String(displayOrder).trim() !== "" ? Number(displayOrder) : null;
+      if (ord != null && (!Number.isInteger(ord) || ord < 0)) {
+        return res.status(400).json({ message: "displayOrder must be an integer >= 0" });
+      }
+      if (ord == null) ord = await nextMachineDisplayOrder(pool);
+      await pool.request()
+        .input("machineNo", sql.NVarChar(100), no)
+        .input("machineName", sql.NVarChar(200), name)
+        .input("displayOrder", sql.Int, ord)
+        .query(`
+          IF OBJECT_ID('dbo.machine_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'machine_master table not found. Run sql/332_machine_master.sql first.', 1;
+          END
+          INSERT INTO dbo.machine_master (machine_no, machine_name, display_order)
+          VALUES (@machineNo, @machineName, @displayOrder)
+        `);
+      res.status(201).json({ ok: true, displayOrder: ord });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/machines/:machineMasterId", async (req, res) => {
+    const id = Number(req.params.machineMasterId);
+    const { machineNo, machineName, displayOrder, activeFlag } = req.body || {};
+    if (!id) return res.status(400).json({ message: "invalid machineMasterId" });
+    const hasNo = machineNo != null;
+    const hasName = machineName != null;
+    const hasOrder = displayOrder != null && String(displayOrder).trim() !== "";
+    const hasActive = activeFlag != null;
+    if (!hasNo && !hasName && !hasOrder && !hasActive) {
+      return res.status(400).json({ message: "nothing to update" });
+    }
+    let ordNum = null;
+    if (hasOrder) {
+      ordNum = Number(displayOrder);
+      if (!Number.isInteger(ordNum) || ordNum < 0) {
+        return res.status(400).json({ message: "displayOrder must be an integer >= 0" });
+      }
+    }
+    try {
+      const pool = await getPool();
+      const reqSql = pool.request().input("id", sql.Int, id);
+      const sets = ["updated_at = SYSDATETIME()"];
+      if (hasNo) {
+        const no = normalizeMachineNo(machineNo);
+        if (!no) return res.status(400).json({ message: "machineNo cannot be empty" });
+        reqSql.input("machineNo", sql.NVarChar(100), no);
+        sets.push("machine_no = @machineNo");
+      }
+      if (hasName) {
+        const name = String(machineName).trim().slice(0, 200);
+        if (!name) return res.status(400).json({ message: "machineName cannot be empty" });
+        reqSql.input("machineName", sql.NVarChar(200), name);
+        sets.push("machine_name = @machineName");
+      }
+      if (hasOrder) {
+        reqSql.input("displayOrder", sql.Int, ordNum);
+        sets.push("display_order = @displayOrder");
+      }
+      if (hasActive) {
+        reqSql.input("activeFlag", sql.Bit, !!activeFlag);
+        sets.push("active_flag = @activeFlag");
+      }
+      const rs = await reqSql.query(`
+        IF OBJECT_ID('dbo.machine_master', 'U') IS NULL
+        BEGIN
+          THROW 50001, 'machine_master table not found. Run sql/332_machine_master.sql first.', 1;
+        END
+        UPDATE dbo.machine_master SET ${sets.join(", ")}
+        WHERE machine_master_id = @id;
+        SELECT @@ROWCOUNT AS n;
+      `);
+      if (!rs.recordset.length || rs.recordset[0].n === 0) {
+        return res.status(404).json({ message: "not found" });
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/admin/machines/:machineMasterId", async (req, res) => {
+    const id = Number(req.params.machineMasterId);
+    if (!id) return res.status(400).json({ message: "invalid machineMasterId" });
+    try {
+      const pool = await getPool();
+      const rs = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+          IF OBJECT_ID('dbo.machine_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'machine_master table not found. Run sql/332_machine_master.sql first.', 1;
+          END
+          DELETE FROM dbo.machine_master WHERE machine_master_id = @id;
+          SELECT @@ROWCOUNT AS n;
+        `);
+      if (rs.recordset[0].n === 0) return res.status(404).json({ message: "not found" });
+      res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ message: e.message });
     }
