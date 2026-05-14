@@ -489,7 +489,7 @@
 </head>
 <body>
   <div id="printRoot" class="print-root" aria-hidden="true"></div>
-  <p class="admin-nav"><strong>QC Check</strong> · <a href="/daily-check-history.html">Monthly History</a> · <a id="adminMasterDataLink" href="/admin.html">Master Data</a></p>
+  <p class="admin-nav"><strong>CHECK SHEET PROD</strong> · <a href="/daily-check-history.html">Monthly History</a> · <a id="adminMasterDataLink" href="/admin.html">Master Data</a></p>
   <div class="screen-sheet">
     <div class="header-sheet">
     <div class="header-main">
@@ -530,6 +530,7 @@
     <label>Sheet Date</label><input id="sheetDate" type="date" />
     <label>Created By</label><input id="createdBy" value="operator01" />
     <datalist id="machineNoDatalist"></datalist>
+    <datalist id="picNoDatalist"></datalist>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="ref-wrap">
@@ -646,7 +647,8 @@
       partNoOptions: [],
       headerBranding: null,
       editingHeaderId: null,
-      machines: []
+      machines: [],
+      pics: []
     };
 
     const DEFAULT_HEADER_BRANDING = {
@@ -671,8 +673,18 @@
     }
 
     const ROWS_PER_RECORD = 3;
+    /** Shown when Start/Finish are unset; keeps the time picker near shift start. */
+    const DEFAULT_SHEET_TIME = "07:00";
     /** Sheet entry columns (results) — A–G only for now. Point-check master can be A–M; see renderReferences. */
     const SHEET_CHECK_CODES = "ABCDEFG".split("");
+    /** Table header text: pair with Excel column H–N (A/H … G/N). */
+    function sheetCheckHeaderLabel(code) {
+      const u = String(code == null ? "" : code).trim().toUpperCase();
+      if (u.length === 1 && u >= "A" && u <= "G") {
+        return `${u}/${String.fromCharCode(u.charCodeAt(0) + 7)}`;
+      }
+      return u || String(code);
+    }
     const EMPTY_CHECKS = () => Object.fromEntries(SHEET_CHECK_CODES.map((c) => [c, ""]));
 
     /** Order rows in the Point Check reference table (master codes A–M). */
@@ -1138,6 +1150,32 @@
       }
     }
 
+    function applyPicDatalist(rows) {
+      state.pics = Array.isArray(rows) ? rows : [];
+      const dl = document.getElementById("picNoDatalist");
+      if (!dl) return;
+      dl.replaceChildren();
+      for (const p of state.pics) {
+        const v = String(p.picNo || "").trim();
+        if (!v) continue;
+        const opt = document.createElement("option");
+        opt.value = v;
+        const lab = String(p.picName || "").trim();
+        if (lab) opt.label = lab;
+        dl.appendChild(opt);
+      }
+    }
+
+    async function loadPicMasterOptions() {
+      try {
+        const res = await fetch("/api/pics");
+        const data = res.ok ? await res.json() : [];
+        applyPicDatalist(data);
+      } catch (_e) {
+        applyPicDatalist([]);
+      }
+    }
+
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = state.processes.map((p, i) =>
@@ -1161,6 +1199,21 @@
       document.getElementById("headerProcessName").textContent = p ? p.processName : "-";
     }
 
+    function syncTimeInputsFromTableWrapToState() {
+      const wrap = document.getElementById("tableWrap");
+      if (!wrap || !state.processes.length) return;
+      const p = state.processes[state.selectedProcessIndex];
+      if (!p) return;
+      const rows = state.rowsByProcess[p.processMasterId];
+      if (!Array.isArray(rows)) return;
+      wrap.querySelectorAll('input[type="time"][data-k="startTime"], input[type="time"][data-k="finishTime"]').forEach((el) => {
+        const i = Number(el.dataset.i);
+        const k = el.dataset.k;
+        if (Number.isNaN(i) || !rows[i]) return;
+        if (k === "startTime" || k === "finishTime") rows[i][k] = el.value;
+      });
+    }
+
     function renderTable() {
       const wrap = document.getElementById("tableWrap");
       if (!state.processes.length) {
@@ -1168,6 +1221,7 @@
           "<p style=\"font-size:12px;color:#666;margin:8px 0;\">Select part and Eff date (year / month). Use Load on the Eff date row to open that month's sheet, or load master data (processes, drawings, point checks) for new entry.</p>";
         return;
       }
+      if (wrap.querySelector("table.detail-sheet")) syncTimeInputsFromTableWrapToState();
       const p = state.processes[state.selectedProcessIndex];
       const key = p.processMasterId;
       if (!state.rowsByProcess[key]) state.rowsByProcess[key] = createEmptyRecordRows(1);
@@ -1196,21 +1250,21 @@
             <col style="width:42px;">
             <col style="width:92px;">
             <col style="width:60px;">
+            <col style="width:88px;">
             <col style="width:60px;">
             <col style="width:74px;">
             <col style="width:52px;">
             <col style="width:52px;">
             <col style="width:52px;">
             <col style="width:52px;">
-            <col style="width:88px;">
             <col span="${SHEET_CHECK_CODES.length}">
             <col style="width:118px;">
             <col style="width:626px;">
           </colgroup>
           <thead>
             <tr>
-              <th>No</th><th>Date</th><th>Machine No</th><th>Start</th><th>Finish</th><th>Qty</th><th>OK</th><th>NG</th><th>PIC</th><th>SOP Check</th>
-              ${SHEET_CHECK_CODES.map((c) => `<th>${c}</th>`).join("")}<th>Leader Check</th><th>Remarks</th>
+              <th>No</th><th>Date</th><th>Machine No</th><th>SOP Check</th><th>Start</th><th>Finish</th><th>Qty</th><th>OK</th><th>NG</th><th>PIC</th>
+              ${SHEET_CHECK_CODES.map((c) => `<th>${sheetCheckHeaderLabel(c)}</th>`).join("")}<th>Leader Check</th><th>Remarks</th>
             </tr>
           </thead>
           <tbody>
@@ -1237,13 +1291,13 @@
                     </div>
                   </td>
                   <td rowspan="${ROWS_PER_RECORD}"><input data-i="${base}" data-k="machineNo" list="machineNoDatalist" value="${header.machineNo || ""}" autocomplete="off"></td>
-                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="startTime" value="${header.startTime || "00:00"}"></td>
-                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="finishTime" value="${header.finishTime || "00:00"}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="checkbox" data-i="${base}" data-k="sopCheck" ${header.sopCheck ? "checked" : ""} aria-label="SOP Check"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="startTime" value="${header.startTime || DEFAULT_SHEET_TIME}"></td>
+                  <td rowspan="${ROWS_PER_RECORD}"><input type="time" data-i="${base}" data-k="finishTime" value="${header.finishTime || DEFAULT_SHEET_TIME}"></td>
                   <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="qty" value="${header.qty}"></td>
                   <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="okCount" value="${header.okCount}"></td>
                   <td rowspan="${ROWS_PER_RECORD}" class="num-col"><input type="text" inputmode="numeric" data-i="${base}" data-k="ngCount" value="${header.ngCount}"></td>
-                  <td rowspan="${ROWS_PER_RECORD}" class="pic-col"><input data-i="${base}" data-k="pic" value="${header.pic || ""}"></td>
-                  <td rowspan="${ROWS_PER_RECORD}"><input type="checkbox" data-i="${base}" data-k="sopCheck" ${header.sopCheck ? "checked" : ""} aria-label="SOP Check"></td>
+                  <td rowspan="${ROWS_PER_RECORD}" class="pic-col"><input data-i="${base}" data-k="pic" list="picNoDatalist" value="${header.pic || ""}" autocomplete="off"></td>
                 ` : "";
                 return `
                   <tr>
@@ -1643,19 +1697,22 @@
       }
       document.getElementById("result").textContent = "Loading…";
       const monthUrl = `/api/checksheets/for-month?formatId=${encodeURIComponent(formatId)}&partNo=${encodeURIComponent(partNo)}&effDate=${encodeURIComponent(effDate)}`;
-      const [processRes, refRes, monthRes, machRes] = await Promise.all([
+      const [processRes, refRes, monthRes, machRes, picRes] = await Promise.all([
         fetch(`/api/formats/${formatId}/processes?partNo=${encodeURIComponent(partNo)}`),
         fetch(`/api/references?formatId=${formatId}&partNo=${encodeURIComponent(partNo)}`),
         fetch(monthUrl),
-        fetch("/api/machines")
+        fetch("/api/machines"),
+        fetch("/api/pics")
       ]);
-      const [processData, refData, monthData, machData] = await Promise.all([
+      const [processData, refData, monthData, machData, picData] = await Promise.all([
         processRes.json(),
         refRes.json(),
         monthRes.json(),
-        machRes.json()
+        machRes.json(),
+        picRes.json()
       ]);
       applyMachineDatalist(machRes.ok ? machData : []);
+      applyPicDatalist(picRes.ok ? picData : []);
       if (!processRes.ok) {
         clearLoadedSheetView(processData.message || JSON.stringify(processData));
         return;
@@ -1834,6 +1891,7 @@
         document.getElementById("result").textContent = "Select Eff date (year and month).";
         return;
       }
+      syncTimeInputsFromTableWrapToState();
       const payload = {
         formatId,
         partNo,
@@ -1992,7 +2050,7 @@
       const qProcessName = params.get("processName") || params.get("process");
 
       await loadFormats();
-      await loadMachineMasterOptions();
+      await Promise.all([loadMachineMasterOptions(), loadPicMasterOptions()]);
       if (qFmt) {
         const fmtSel = document.getElementById("format");
         const exists = [...fmtSel.options].some((o) => String(o.value) === String(qFmt));

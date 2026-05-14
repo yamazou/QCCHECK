@@ -37,6 +37,52 @@ function registerAdminRoutes(app, sql, getPool) {
     });
   }
 
+  function mssqlUniqueErrorNumber(err) {
+    return Number(err?.number ?? err?.originalError?.number);
+  }
+
+  /** SQL Server: 2627 = UNIQUE KEY, 2601 = unique index duplicate */
+  function isSqlUniqueConstraintError(err) {
+    const n = mssqlUniqueErrorNumber(err);
+    return n === 2627 || n === 2601;
+  }
+
+  function isMachineMasterUniqueViolation(err) {
+    const msg = String(err?.message ?? "");
+    if (isSqlUniqueConstraintError(err)) {
+      return /machine_master/i.test(msg) || /UQ_machine_master_no/i.test(msg);
+    }
+    return /UQ_machine_master_no/i.test(msg) || (/duplicate key/i.test(msg) && /machine_master/i.test(msg));
+  }
+
+  function isPicMasterUniqueViolation(err) {
+    const msg = String(err?.message ?? "");
+    if (isSqlUniqueConstraintError(err)) {
+      return /pic_master/i.test(msg) || /UQ_pic_master_no/i.test(msg);
+    }
+    return /UQ_pic_master_no/i.test(msg) || (/duplicate key/i.test(msg) && /pic_master/i.test(msg));
+  }
+
+  /** part_master UNIQUE (format_id, part_no) */
+  function isPartMasterFormatPartUniqueViolation(err) {
+    const msg = String(err?.message ?? "");
+    if (/UQ_pm_format_part_order/i.test(msg)) return false;
+    const partConstraintHit = /UQ_pm_format_part/i.test(msg) && !/UQ_pm_format_part_order/i.test(msg);
+    if (isSqlUniqueConstraintError(err)) {
+      return /part_master/i.test(msg) || partConstraintHit;
+    }
+    return partConstraintHit || (/duplicate key/i.test(msg) && /part_master/i.test(msg));
+  }
+
+  /** process_master UNIQUE (format_id, part_no, display_order) */
+  function isProcessMasterOrderUniqueViolation(err) {
+    const msg = String(err?.message ?? "");
+    if (isSqlUniqueConstraintError(err)) {
+      return /process_master/i.test(msg) || /UQ_pm_format_part_order/i.test(msg);
+    }
+    return /UQ_pm_format_part_order/i.test(msg) || (/duplicate key/i.test(msg) && /process_master/i.test(msg));
+  }
+
   async function nextProcessDisplayOrder(pool, formatId, partNo) {
     const rs = await pool.request()
       .input("formatId", sql.Int, formatId)
@@ -369,7 +415,9 @@ function registerAdminRoutes(app, sql, getPool) {
         `);
       if (dup.recordset.length) {
         await transaction.rollback();
-        return res.status(409).json({ message: "partNo already exists for this format" });
+        return res.status(409).json({
+          message: `この Part No はこのフォーマットで既に使用されています（部品マスタまたは工程マスタ）: "${pn}"`
+        });
       }
 
       await new sql.Request(transaction)
@@ -402,6 +450,16 @@ function registerAdminRoutes(app, sql, getPool) {
       res.status(201).json({ ok: true, partNo: pn });
     } catch (e) {
       if (transaction) try { await transaction.rollback(); } catch (_e) { /* ignore */ }
+      if (isPartMasterFormatPartUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この Part No は既にこのフォーマットに登録されています: "${pn}"`
+        });
+      }
+      if (isProcessMasterOrderUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この Part No と工程表示順の組み合わせは既に存在します: "${pn}"`
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -518,6 +576,11 @@ function registerAdminRoutes(app, sql, getPool) {
         `);
       res.status(201).json({ ok: true, displayOrder: ord });
     } catch (e) {
+      if (isProcessMasterOrderUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この Part No と工程表示順の組み合わせは既に存在します: "${pn}"`
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -627,6 +690,11 @@ function registerAdminRoutes(app, sql, getPool) {
       }
       res.json({ ok: true });
     } catch (e) {
+      if (isProcessMasterOrderUniqueViolation(e)) {
+        return res.status(409).json({
+          message: "この Part の工程表示順が別の工程と重複しています。"
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -1050,6 +1118,11 @@ function registerAdminRoutes(app, sql, getPool) {
       }
       res.json({ ok: true, created: false });
     } catch (e) {
+      if (isPartMasterFormatPartUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この Part No は既にこのフォーマットに登録されています: "${partNo}"`
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -1114,6 +1187,11 @@ function registerAdminRoutes(app, sql, getPool) {
         `);
       res.status(201).json({ ok: true, displayOrder: ord });
     } catch (e) {
+      if (isMachineMasterUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この Machine No は既に登録されています: "${no}"`
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -1174,6 +1252,14 @@ function registerAdminRoutes(app, sql, getPool) {
       }
       res.json({ ok: true });
     } catch (e) {
+      if (isMachineMasterUniqueViolation(e)) {
+        const dupNo = hasNo ? normalizeMachineNo(machineNo) : "";
+        return res.status(409).json({
+          message: dupNo
+            ? `この Machine No は既に他の行で使用されています: "${dupNo}"`
+            : "この Machine No は既に他の行で使用されています。"
+        });
+      }
       res.status(500).json({ message: e.message });
     }
   });
@@ -1191,6 +1277,165 @@ function registerAdminRoutes(app, sql, getPool) {
             THROW 50001, 'machine_master table not found. Run sql/332_machine_master.sql first.', 1;
           END
           DELETE FROM dbo.machine_master WHERE machine_master_id = @id;
+          SELECT @@ROWCOUNT AS n;
+        `);
+      if (rs.recordset[0].n === 0) return res.status(404).json({ message: "not found" });
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  function normalizePicNo(input) {
+    return String(input || "").trim().slice(0, 100);
+  }
+
+  async function nextPicDisplayOrder(pool) {
+    const rs = await pool.request().query(`
+      IF OBJECT_ID('dbo.pic_master', 'U') IS NULL SELECT 1 AS n
+      ELSE SELECT ISNULL(MAX(display_order), 0) + 1 AS n FROM dbo.pic_master
+    `);
+    return rs.recordset[0].n;
+  }
+
+  /** List all PICs (admin); requires sql/333_pic_master.sql */
+  app.get("/api/admin/pics", async (_req, res) => {
+    try {
+      const pool = await getPool();
+      const rs = await pool.request().query(`
+        IF OBJECT_ID('dbo.pic_master', 'U') IS NULL
+        BEGIN
+          THROW 50001, 'pic_master table not found. Run sql/333_pic_master.sql first.', 1;
+        END
+        SELECT pic_master_id AS picMasterId, pic_no AS picNo, pic_name AS picName,
+               display_order AS displayOrder, active_flag AS activeFlag
+        FROM dbo.pic_master
+        ORDER BY display_order, pic_no
+      `);
+      res.json(rs.recordset);
+    } catch (e) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/admin/pics", async (req, res) => {
+    const { picNo, picName, displayOrder } = req.body || {};
+    const no = normalizePicNo(picNo);
+    const name = String(picName || "").trim().slice(0, 200);
+    if (!no || !name) {
+      return res.status(400).json({ message: "picNo and picName are required" });
+    }
+    try {
+      const pool = await getPool();
+      let ord = displayOrder != null && String(displayOrder).trim() !== "" ? Number(displayOrder) : null;
+      if (ord != null && (!Number.isInteger(ord) || ord < 0)) {
+        return res.status(400).json({ message: "displayOrder must be an integer >= 0" });
+      }
+      if (ord == null) ord = await nextPicDisplayOrder(pool);
+      await pool.request()
+        .input("picNo", sql.NVarChar(100), no)
+        .input("picName", sql.NVarChar(200), name)
+        .input("displayOrder", sql.Int, ord)
+        .query(`
+          IF OBJECT_ID('dbo.pic_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'pic_master table not found. Run sql/333_pic_master.sql first.', 1;
+          END
+          INSERT INTO dbo.pic_master (pic_no, pic_name, display_order)
+          VALUES (@picNo, @picName, @displayOrder)
+        `);
+      res.status(201).json({ ok: true, displayOrder: ord });
+    } catch (e) {
+      if (isPicMasterUniqueViolation(e)) {
+        return res.status(409).json({
+          message: `この PIC No は既に登録されています: "${no}"`
+        });
+      }
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/pics/:picMasterId", async (req, res) => {
+    const id = Number(req.params.picMasterId);
+    const { picNo, picName, displayOrder, activeFlag } = req.body || {};
+    if (!id) return res.status(400).json({ message: "invalid picMasterId" });
+    const hasNo = picNo != null;
+    const hasName = picName != null;
+    const hasOrder = displayOrder != null && String(displayOrder).trim() !== "";
+    const hasActive = activeFlag != null;
+    if (!hasNo && !hasName && !hasOrder && !hasActive) {
+      return res.status(400).json({ message: "nothing to update" });
+    }
+    let ordNum = null;
+    if (hasOrder) {
+      ordNum = Number(displayOrder);
+      if (!Number.isInteger(ordNum) || ordNum < 0) {
+        return res.status(400).json({ message: "displayOrder must be an integer >= 0" });
+      }
+    }
+    try {
+      const pool = await getPool();
+      const reqSql = pool.request().input("id", sql.Int, id);
+      const sets = ["updated_at = SYSDATETIME()"];
+      if (hasNo) {
+        const no = normalizePicNo(picNo);
+        if (!no) return res.status(400).json({ message: "picNo cannot be empty" });
+        reqSql.input("picNo", sql.NVarChar(100), no);
+        sets.push("pic_no = @picNo");
+      }
+      if (hasName) {
+        const n = String(picName).trim().slice(0, 200);
+        if (!n) return res.status(400).json({ message: "picName cannot be empty" });
+        reqSql.input("picName", sql.NVarChar(200), n);
+        sets.push("pic_name = @picName");
+      }
+      if (hasOrder) {
+        reqSql.input("displayOrder", sql.Int, ordNum);
+        sets.push("display_order = @displayOrder");
+      }
+      if (hasActive) {
+        reqSql.input("activeFlag", sql.Bit, !!activeFlag);
+        sets.push("active_flag = @activeFlag");
+      }
+      const rs = await reqSql.query(`
+        IF OBJECT_ID('dbo.pic_master', 'U') IS NULL
+        BEGIN
+          THROW 50001, 'pic_master table not found. Run sql/333_pic_master.sql first.', 1;
+        END
+        UPDATE dbo.pic_master SET ${sets.join(", ")}
+        WHERE pic_master_id = @id;
+        SELECT @@ROWCOUNT AS n;
+      `);
+      if (!rs.recordset.length || rs.recordset[0].n === 0) {
+        return res.status(404).json({ message: "not found" });
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      if (isPicMasterUniqueViolation(e)) {
+        const dupNo = hasNo ? normalizePicNo(picNo) : "";
+        return res.status(409).json({
+          message: dupNo
+            ? `この PIC No は既に他の行で使用されています: "${dupNo}"`
+            : "この PIC No は既に他の行で使用されています。"
+        });
+      }
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/admin/pics/:picMasterId", async (req, res) => {
+    const id = Number(req.params.picMasterId);
+    if (!id) return res.status(400).json({ message: "invalid picMasterId" });
+    try {
+      const pool = await getPool();
+      const rs = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+          IF OBJECT_ID('dbo.pic_master', 'U') IS NULL
+          BEGIN
+            THROW 50001, 'pic_master table not found. Run sql/333_pic_master.sql first.', 1;
+          END
+          DELETE FROM dbo.pic_master WHERE pic_master_id = @id;
           SELECT @@ROWCOUNT AS n;
         `);
       if (rs.recordset[0].n === 0) return res.status(404).json({ message: "not found" });

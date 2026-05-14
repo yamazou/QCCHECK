@@ -444,6 +444,34 @@ app.get("/api/machines", async (req, res) => {
   }
 });
 
+/**
+ * PIC master for checklist suggestions (active only), same pattern as /api/machines.
+ */
+app.get("/api/pics", async (req, res) => {
+  const forSort = String(req.query.forSort || "").trim() === "1";
+  try {
+    const pool = await getPool();
+    const activeOnly = forSort ? "" : "WHERE active_flag = 1";
+    const rs = await pool.request().query(`
+      IF OBJECT_ID('dbo.pic_master', 'U') IS NULL
+        SELECT CAST(NULL AS INT) AS picMasterId,
+               CAST(NULL AS NVARCHAR(100)) AS picNo,
+               CAST(NULL AS NVARCHAR(200)) AS picName,
+               CAST(NULL AS INT) AS displayOrder
+        WHERE 1 = 0;
+      ELSE
+        SELECT pic_master_id AS picMasterId, pic_no AS picNo, pic_name AS picName,
+               display_order AS displayOrder
+        FROM dbo.pic_master
+        ${activeOnly}
+        ORDER BY display_order, pic_no;
+    `);
+    res.json(rs.recordset);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 app.get("/api/formats/:formatId/processes", async (req, res) => {
   const { formatId } = req.params;
   const { partNo } = req.query;

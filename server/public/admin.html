@@ -326,7 +326,7 @@
           </div>
         </div>
         <p class="sub">
-          <a id="checkSheetLink" href="/">QC Check</a>
+          <a id="checkSheetLink" href="/">CHECK SHEET PROD</a>
           <span aria-hidden="true"> · </span>
           <a href="/daily-check-history.html">Monthly History</a>
           <span aria-hidden="true"> · </span>
@@ -379,6 +379,22 @@
       <div><label>New machine name</label><input id="newMachineName" placeholder="e.g. Press 200T" style="width:220px;" maxlength="200" /></div>
       <button type="button" id="btnAddMachine">Add machine</button>
       <button type="button" id="btnReloadMachines">Reload machines</button>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:12px;">
+    <h2>PIC master</h2>
+    <p class="muted">Checklist PIC field uses these rows as suggestions, ordered by Display order.</p>
+    <div id="picMsg" class="err" style="display:none;"></div>
+    <table id="picTable">
+      <thead><tr><th>PIC No</th><th>PIC name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:8px;">
+      <div><label>New PIC no</label><input id="newPicNo" placeholder="e.g. JD01" style="width:120px;" maxlength="100" /></div>
+      <div><label>New PIC name</label><input id="newPicName" placeholder="e.g. John Doe" style="width:220px;" maxlength="200" /></div>
+      <button type="button" id="btnAddPic">Add PIC</button>
+      <button type="button" id="btnReloadPics">Reload PICs</button>
     </div>
   </div>
 
@@ -588,6 +604,7 @@
     }
 
     let machineRows = [];
+    let picRows = [];
 
     async function loadMachines() {
       showErr("machineMsg", "");
@@ -659,6 +676,81 @@
               return;
             }
             await loadMachines();
+          });
+        };
+      });
+    }
+
+    async function loadPics() {
+      showErr("picMsg", "");
+      const res = await fetch("/api/admin/pics");
+      const data = await res.json().catch(() => ([]));
+      if (!res.ok) {
+        picRows = [];
+        renderPicTable();
+        showErr("picMsg", data.message || JSON.stringify(data));
+        return;
+      }
+      picRows = Array.isArray(data) ? data : [];
+      renderPicTable();
+    }
+
+    function renderPicTable() {
+      const tb = document.querySelector("#picTable tbody");
+      if (!tb) return;
+      tb.innerHTML = picRows.map((p) => {
+        const id = Number(p.picMasterId);
+        const noEsc = escapeHtml(String(p.picNo || ""));
+        const nameEsc = escapeHtml(String(p.picName || ""));
+        return `<tr data-pid="${id}">
+          <td><input class="picm-no" value="${noEsc}" style="width:100%;max-width:140px;" maxlength="100" /></td>
+          <td><input class="picm-name" value="${nameEsc}" style="width:100%;max-width:260px;" maxlength="200" /></td>
+          <td><input class="picm-ord" type="number" min="0" step="1" value="${Number(p.displayOrder) || 0}" style="width:72px;" /></td>
+          <td><input class="picm-act" type="checkbox" ${p.activeFlag ? "checked" : ""} /></td>
+          <td class="row-actions">
+            <button type="button" class="btn-picm-save">Save</button>
+            <button type="button" class="btn-picm-del btn-del">Delete</button>
+          </td>
+        </tr>`;
+      }).join("");
+      tb.querySelectorAll(".btn-picm-save").forEach((btn) => {
+        btn.onclick = () => {
+          const tr = btn.closest("tr");
+          if (!tr) return;
+          runActionWithButtonFeedback(btn, async () => {
+            const pid = Number(tr.dataset.pid);
+            const picNo = tr.querySelector(".picm-no")?.value ?? "";
+            const picName = tr.querySelector(".picm-name")?.value ?? "";
+            const displayOrder = tr.querySelector(".picm-ord")?.value ?? "";
+            const activeFlag = !!tr.querySelector(".picm-act")?.checked;
+            const res = await fetch(`/api/admin/pics/${encodeURIComponent(pid)}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ picNo, picName, displayOrder, activeFlag })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              showErr("picMsg", data.message || res.status);
+              return;
+            }
+            await loadPics();
+          });
+        };
+      });
+      tb.querySelectorAll(".btn-picm-del").forEach((btn) => {
+        btn.onclick = () => {
+          const tr = btn.closest("tr");
+          if (!tr) return;
+          const pid = Number(tr.dataset.pid);
+          if (!pid || !window.confirm("Delete this PIC row?")) return;
+          runActionWithButtonFeedback(btn, async () => {
+            const res = await fetch(`/api/admin/pics/${encodeURIComponent(pid)}`, { method: "DELETE" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              showErr("picMsg", data.message || res.status);
+              return;
+            }
+            await loadPics();
           });
         };
       });
@@ -1389,6 +1481,33 @@
       });
     };
 
+    document.getElementById("btnReloadPics").onclick = () => {
+      runActionWithButtonFeedback("btnReloadPics", loadPics);
+    };
+    document.getElementById("btnAddPic").onclick = () => {
+      runActionWithButtonFeedback("btnAddPic", async () => {
+        const picNo = document.getElementById("newPicNo").value.trim();
+        const picName = document.getElementById("newPicName").value.trim();
+        if (!picNo || !picName) {
+          showErr("picMsg", "PIC no and PIC name are required.");
+          return;
+        }
+        const res = await fetch("/api/admin/pics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ picNo, picName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showErr("picMsg", data.message || res.status);
+          return;
+        }
+        document.getElementById("newPicNo").value = "";
+        document.getElementById("newPicName").value = "";
+        await loadPics();
+      });
+    };
+
     function readAdminOpenQuery() {
       let partNo = "";
       let formatIdFromUrl = null;
@@ -1412,6 +1531,7 @@
       const openQ = readAdminOpenQuery();
       await loadFormats();
       await loadMachines();
+      await loadPics();
       if (
         openQ.formatIdFromUrl != null &&
         Array.isArray(formats) &&
